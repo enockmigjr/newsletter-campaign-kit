@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.1.4
+ * Version: 0.1.5
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.1.4' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.1.5' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -45,6 +45,12 @@ function newsletter_campaign_kit_get_audit_table() {
 	global $wpdb;
 
 	return $wpdb->prefix . 'newsletter_campaign_audit';
+}
+
+function newsletter_campaign_kit_get_campaigns_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_campaigns';
 }
 
 function newsletter_campaign_kit_get_lists_table() {
@@ -121,6 +127,30 @@ function newsletter_campaign_kit_activate() {
 	) {$charset_collate};";
 
 	dbDelta( $audit_sql );
+	$campaigns_table = newsletter_campaign_kit_get_campaigns_table();
+	$campaigns_sql   = "CREATE TABLE {$campaigns_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		title varchar(190) NOT NULL,
+		slug varchar(220) NOT NULL,
+		subject varchar(190) NOT NULL,
+		preview_text varchar(255) NULL,
+		body longtext NULL,
+		status varchar(32) NOT NULL DEFAULT 'draft',
+		target_list_id bigint(20) unsigned NULL,
+		scheduled_at datetime NULL,
+		sent_at datetime NULL,
+		created_by bigint(20) unsigned NULL,
+		updated_by bigint(20) unsigned NULL,
+		created_at datetime NOT NULL,
+		updated_at datetime NOT NULL,
+		PRIMARY KEY  (id),
+		UNIQUE KEY slug (slug),
+		KEY status (status),
+		KEY target_list_id (target_list_id),
+		KEY scheduled_at (scheduled_at)
+	) {$charset_collate};";
+
+	dbDelta( $campaigns_sql );
 
 	$lists_table            = newsletter_campaign_kit_get_lists_table();
 	$tags_table             = newsletter_campaign_kit_get_tags_table();
@@ -199,4 +229,5 @@ add_action( 'init', 'newsletter_campaign_kit_maybe_upgrade' );
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/subscribers.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segments.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/campaigns.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/admin.php';

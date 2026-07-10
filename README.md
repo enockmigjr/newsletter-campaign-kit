@@ -8,7 +8,9 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Stocker l'email, un email hash, un token de desinscription, source, consentement, IP hash et user-agent tronque.
 - Permettre la desinscription publique par token sans exposer l'email dans l'URL.
 - Fournir une premiere UI admin pour consulter, filtrer, changer le statut et exporter les abonnes.
-- Creer des listes et tags de segmentation avec liaisons abonnés/listes/tags.
+- Creer des listes et tags de segmentation avec liaisons abonnes/listes/tags.
+- Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
+- Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
 
 ## Capabilities
 
@@ -29,6 +31,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `{$wpdb->prefix}newsletter_campaign_subscriber_lists`
 - `{$wpdb->prefix}newsletter_campaign_subscriber_tags`
 - `{$wpdb->prefix}newsletter_campaign_audit`
+- `{$wpdb->prefix}newsletter_campaign_campaigns`
 
 ## Options
 
@@ -44,6 +47,8 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `admin_post_newsletter_campaign_kit_export_subscribers`
 - `admin_post_newsletter_campaign_kit_create_list`
 - `admin_post_newsletter_campaign_kit_create_tag`
+- `admin_post_newsletter_campaign_kit_create_campaign`
+- `admin_post_newsletter_campaign_kit_transition_campaign`
 
 ## Verification minimale
 
@@ -53,14 +58,13 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 4. Tester unsubscribe avec token valide, token invalide et second clic.
 5. Tester que l'export CSV exige `newsletter_view_reports`.
 6. Tester que le changement de statut exige la capability newsletter_manage_subscribers.
-ewsletter_manage_subscribers.
 7. Verifier que la page Audit exige la capability newsletter_view_reports et ne stocke pas IP brute, token ou email dans le contexte.
-ewsletter_view_reports et ne stocke pas IP brute, token ou email dans le contexte.
+8. Verifier que les campagnes exigent newsletter_create_campaigns et que les transitions d'envoi exigent newsletter_send_campaigns.
 
 ## Reste majeur
 
 - Imports/exports avances de listes, tags et segments.
-- Campagnes, templates, etats et transitions serveur.
+- Templates reutilisables avances et previsualisation email.
 - Queue d'envoi batch avec retry/backoff.
 - Provider abstraction SMTP/API.
 - Reporting campagne.

@@ -10,6 +10,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Fournir une premiere UI admin pour consulter, filtrer, changer le statut et exporter les abonnes.
 - Creer des listes et tags de segmentation avec liaisons abonnes/listes/tags.
 - Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
+- Preparer une queue batch avec retry/backoff pour les futures livraisons email.
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
 
 ## Capabilities
@@ -32,6 +33,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `{$wpdb->prefix}newsletter_campaign_subscriber_tags`
 - `{$wpdb->prefix}newsletter_campaign_audit`
 - `{$wpdb->prefix}newsletter_campaign_campaigns`
+- `{$wpdb->prefix}newsletter_campaign_queue`
 
 ## Options
 
@@ -49,6 +51,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `admin_post_newsletter_campaign_kit_create_tag`
 - `admin_post_newsletter_campaign_kit_create_campaign`
 - `admin_post_newsletter_campaign_kit_transition_campaign`
+- `admin_post_newsletter_campaign_kit_process_queue`
 
 ## Verification minimale
 
@@ -60,11 +63,12 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 6. Tester que le changement de statut exige la capability newsletter_manage_subscribers.
 7. Verifier que la page Audit exige la capability newsletter_view_reports et ne stocke pas IP brute, token ou email dans le contexte.
 8. Verifier que les campagnes exigent newsletter_create_campaigns et que les transitions d'envoi exigent newsletter_send_campaigns.
+9. Verifier que la queue exige newsletter_send_campaigns et retente avec backoff lorsqu'aucun provider n'est branche.
 
 ## Reste majeur
 
 - Imports/exports avances de listes, tags et segments.
 - Templates reutilisables avances et previsualisation email.
-- Queue d'envoi batch avec retry/backoff.
+- Provider SMTP/API reel pour traiter la queue.
 - Provider abstraction SMTP/API.
 - Reporting campagne.

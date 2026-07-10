@@ -168,6 +168,10 @@ function newsletter_campaign_kit_handle_transition_campaign() {
 		);
 	}
 
+	if ( false !== $updated && function_exists( 'newsletter_campaign_kit_sync_queue_for_campaign_transition' ) ) {
+		newsletter_campaign_kit_sync_queue_for_campaign_transition( $campaign_id, $next_status );
+	}
+
 	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns&transition=' . ( false === $updated ? 'failed' : 'success' ) ) );
 	exit;
 }

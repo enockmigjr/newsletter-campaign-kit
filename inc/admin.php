@@ -45,6 +45,14 @@ function newsletter_campaign_kit_register_admin_menu() {
 		'newsletter-campaign-kit',
 		'newsletter_campaign_kit_render_subscribers_page'
 	);
+	add_submenu_page(
+		'newsletter-campaign-kit',
+		__( 'Lists & segments', 'newsletter-campaign-kit' ),
+		__( 'Lists & segments', 'newsletter-campaign-kit' ),
+		'newsletter_manage_lists',
+		'newsletter-campaign-kit-segments',
+		'newsletter_campaign_kit_render_segments_page'
+	);
 }
 add_action( 'admin_menu', 'newsletter_campaign_kit_register_admin_menu' );
 

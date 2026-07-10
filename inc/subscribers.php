@@ -112,7 +112,15 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 			array( '%d' )
 		);
 
-		return false === $updated ? new WP_Error( 'db_error', __( 'Subscription could not be saved.', 'newsletter-campaign-kit' ) ) : true;
+		if ( false === $updated ) {
+			return new WP_Error( 'db_error', __( 'Subscription could not be saved.', 'newsletter-campaign-kit' ) );
+		}
+
+		if ( function_exists( 'newsletter_campaign_kit_get_default_list_id' ) ) {
+			newsletter_campaign_kit_assign_subscriber_to_list( (int) $existing_id, newsletter_campaign_kit_get_default_list_id() );
+		}
+
+		return true;
 	}
 
 	$data['email_hash'] = $email_hash;
@@ -124,7 +132,15 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 		array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 	);
 
-	return false === $inserted ? new WP_Error( 'db_error', __( 'Subscription could not be saved.', 'newsletter-campaign-kit' ) ) : true;
+	if ( false === $inserted ) {
+		return new WP_Error( 'db_error', __( 'Subscription could not be saved.', 'newsletter-campaign-kit' ) );
+	}
+
+	if ( function_exists( 'newsletter_campaign_kit_get_default_list_id' ) ) {
+		newsletter_campaign_kit_assign_subscriber_to_list( (int) $wpdb->insert_id, newsletter_campaign_kit_get_default_list_id() );
+	}
+
+	return true;
 }
 
 /**

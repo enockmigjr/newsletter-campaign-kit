@@ -8,6 +8,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Stocker l'email, un email hash, un token de desinscription, source, consentement, IP hash et user-agent tronque.
 - Permettre la desinscription publique par token sans exposer l'email dans l'URL.
 - Fournir une premiere UI admin pour consulter, filtrer, changer le statut et exporter les abonnes.
+- Creer des listes et tags de segmentation avec liaisons abonnés/listes/tags.
 
 ## Capabilities
 
@@ -23,6 +24,10 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 ## Tables
 
 - `{$wpdb->prefix}newsletter_campaign_subscribers`
+- `{$wpdb->prefix}newsletter_campaign_lists`
+- `{$wpdb->prefix}newsletter_campaign_tags`
+- `{$wpdb->prefix}newsletter_campaign_subscriber_lists`
+- `{$wpdb->prefix}newsletter_campaign_subscriber_tags`
 
 ## Options
 
@@ -36,6 +41,8 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `admin_post_newsletter_campaign_kit_unsubscribe`
 - `admin_post_newsletter_campaign_kit_update_subscriber_status`
 - `admin_post_newsletter_campaign_kit_export_subscribers`
+- `admin_post_newsletter_campaign_kit_create_list`
+- `admin_post_newsletter_campaign_kit_create_tag`
 
 ## Verification minimale
 
@@ -48,7 +55,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 
 ## Reste majeur
 
-- Listes, segments, tags et imports/exports avances.
+- Imports/exports avances de listes, tags et segments.
 - Campagnes, templates, etats et transitions serveur.
 - Queue d'envoi batch avec retry/backoff.
 - Provider abstraction SMTP/API.

@@ -12,6 +12,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
 - Preparer une queue batch avec retry/backoff pour les futures livraisons email.
 - Configurer un provider `wp_mail` ou un adaptateur externe via filtre WordPress.
+- Afficher un reporting de livraison par campagne depuis la queue.
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
 
 ## Capabilities
@@ -68,6 +69,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 8. Verifier que les campagnes exigent newsletter_create_campaigns et que les transitions d'envoi exigent newsletter_send_campaigns.
 9. Verifier que la queue exige newsletter_send_campaigns et retente avec backoff lorsqu'aucun provider n'est branche.
 10. Verifier que le provider wp_mail exige newsletter_manage_settings pour ses reglages et n'enregistre aucun secret.
+11. Verifier que les reports exigent newsletter_view_reports et n'inventent pas ouvertures/clics sans tracking.
 
 ## Reste majeur
 
@@ -75,4 +77,4 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - Templates reutilisables avances et previsualisation email.
 - Provider API externe avance avec secrets hors Git.
 - Provider abstraction SMTP/API.
-- Reporting campagne.
+- Tracking ouvertures/clics et exports de reporting avances.

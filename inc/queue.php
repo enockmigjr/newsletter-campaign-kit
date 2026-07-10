@@ -291,7 +291,7 @@ function newsletter_campaign_kit_render_queue_page() {
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Delivery queue', 'newsletter-campaign-kit' ); ?></h1>
-		<p><?php esc_html_e( 'Batch delivery queue with attempts, retry backoff, and provider handoff. No email is sent until a provider handles the send filter.', 'newsletter-campaign-kit' ); ?></p>
+		<p><?php esc_html_e( 'Batch delivery queue with attempts, retry backoff, wp_mail delivery, and optional external provider handoff.', 'newsletter-campaign-kit' ); ?></p>
 
 		<div class="nck-grid">
 			<?php foreach ( array( 'total', 'pending', 'sent', 'failed', 'paused', 'cancelled' ) as $status ) : ?>

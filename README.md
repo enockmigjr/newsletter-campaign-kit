@@ -11,6 +11,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Creer des listes et tags de segmentation avec liaisons abonnes/listes/tags.
 - Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
 - Preparer une queue batch avec retry/backoff pour les futures livraisons email.
+- Configurer un provider `wp_mail` ou un adaptateur externe via filtre WordPress.
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
 
 ## Capabilities
@@ -38,6 +39,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 ## Options
 
 - `newsletter_campaign_kit_version`
+- `newsletter_campaign_kit_provider_settings`
 
 ## Actions admin-post
 
@@ -52,6 +54,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `admin_post_newsletter_campaign_kit_create_campaign`
 - `admin_post_newsletter_campaign_kit_transition_campaign`
 - `admin_post_newsletter_campaign_kit_process_queue`
+- `admin_post_newsletter_campaign_kit_save_provider_settings`
 
 ## Verification minimale
 
@@ -64,11 +67,12 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 7. Verifier que la page Audit exige la capability newsletter_view_reports et ne stocke pas IP brute, token ou email dans le contexte.
 8. Verifier que les campagnes exigent newsletter_create_campaigns et que les transitions d'envoi exigent newsletter_send_campaigns.
 9. Verifier que la queue exige newsletter_send_campaigns et retente avec backoff lorsqu'aucun provider n'est branche.
+10. Verifier que le provider wp_mail exige newsletter_manage_settings pour ses reglages et n'enregistre aucun secret.
 
 ## Reste majeur
 
 - Imports/exports avances de listes, tags et segments.
 - Templates reutilisables avances et previsualisation email.
-- Provider SMTP/API reel pour traiter la queue.
+- Provider API externe avance avec secrets hors Git.
 - Provider abstraction SMTP/API.
 - Reporting campagne.

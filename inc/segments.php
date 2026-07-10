@@ -165,6 +165,10 @@ function newsletter_campaign_kit_handle_create_list() {
 		array( '%s', '%s', '%s', '%s', '%s', '%s' )
 	);
 
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( false === $ok ? 'newsletter_list_create_failed' : 'newsletter_list_created', false === $ok ? 'failure' : 'success', 0, array( 'name' => $name ) );
+	}
+
 	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&created=' . ( false === $ok ? 'failed' : 'list' ) ) );
 	exit;
 }
@@ -198,6 +202,10 @@ function newsletter_campaign_kit_handle_create_tag() {
 		),
 		array( '%s', '%s', '%s', '%s', '%s' )
 	);
+
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( false === $ok ? 'newsletter_tag_create_failed' : 'newsletter_tag_created', false === $ok ? 'failure' : 'success', 0, array( 'name' => $name ) );
+	}
 
 	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&created=' . ( false === $ok ? 'failed' : 'tag' ) ) );
 	exit;

@@ -120,6 +120,10 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 			newsletter_campaign_kit_assign_subscriber_to_list( (int) $existing_id, newsletter_campaign_kit_get_default_list_id() );
 		}
 
+		if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+			newsletter_campaign_kit_log_event( 'newsletter_subscribe_reactivated', 'success', (int) $existing_id, array( 'source' => sanitize_key( $source ) ) );
+		}
+
 		return true;
 	}
 
@@ -138,6 +142,10 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 
 	if ( function_exists( 'newsletter_campaign_kit_get_default_list_id' ) ) {
 		newsletter_campaign_kit_assign_subscriber_to_list( (int) $wpdb->insert_id, newsletter_campaign_kit_get_default_list_id() );
+	}
+
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( 'newsletter_subscribe_created', 'success', (int) $wpdb->insert_id, array( 'source' => sanitize_key( $source ) ) );
 	}
 
 	return true;
@@ -163,6 +171,9 @@ function newsletter_campaign_kit_handle_subscribe() {
 	$result       = newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text );
 
 	if ( is_wp_error( $result ) ) {
+		if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+			newsletter_campaign_kit_log_event( 'newsletter_subscribe_rejected', 'warning', 0, array( 'reason' => $result->get_error_code(), 'source' => $source ) );
+		}
 		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( $result->get_error_code() ) );
 		exit;
 	}
@@ -196,6 +207,10 @@ function newsletter_campaign_kit_handle_unsubscribe() {
 		array( '%s', '%s' ),
 		array( '%s' )
 	);
+
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( false === $updated ? 'newsletter_unsubscribe_failed' : 'newsletter_unsubscribe', false === $updated ? 'failure' : 'success' );
+	}
 
 	$status = false === $updated ? 'unsubscribe_failed' : 'unsubscribed';
 	wp_safe_redirect( add_query_arg( 'newsletter', $status, home_url( '/' ) ) );

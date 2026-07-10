@@ -28,6 +28,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `{$wpdb->prefix}newsletter_campaign_tags`
 - `{$wpdb->prefix}newsletter_campaign_subscriber_lists`
 - `{$wpdb->prefix}newsletter_campaign_subscriber_tags`
+- `{$wpdb->prefix}newsletter_campaign_audit`
 
 ## Options
 
@@ -51,7 +52,10 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 3. Tester refus si nonce, email ou consentement manque.
 4. Tester unsubscribe avec token valide, token invalide et second clic.
 5. Tester que l'export CSV exige `newsletter_view_reports`.
-6. Tester que le changement de statut exige `newsletter_manage_subscribers`.
+6. Tester que le changement de statut exige la capability newsletter_manage_subscribers.
+ewsletter_manage_subscribers.
+7. Verifier que la page Audit exige la capability newsletter_view_reports et ne stocke pas IP brute, token ou email dans le contexte.
+ewsletter_view_reports et ne stocke pas IP brute, token ou email dans le contexte.
 
 ## Reste majeur
 
@@ -60,4 +64,3 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - Queue d'envoi batch avec retry/backoff.
 - Provider abstraction SMTP/API.
 - Reporting campagne.
-- Audit newsletter.

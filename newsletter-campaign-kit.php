@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.1.3
+ * Version: 0.1.4
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.1.3' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.1.4' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -39,6 +39,12 @@ function newsletter_campaign_kit_get_subscribers_table() {
 	global $wpdb;
 
 	return $wpdb->prefix . 'newsletter_campaign_subscribers';
+}
+
+function newsletter_campaign_kit_get_audit_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_audit';
 }
 
 function newsletter_campaign_kit_get_lists_table() {
@@ -95,6 +101,26 @@ function newsletter_campaign_kit_activate() {
 	) {$charset_collate};";
 
 	dbDelta( $sql );
+
+	$audit_table = newsletter_campaign_kit_get_audit_table();
+	$audit_sql   = "CREATE TABLE {$audit_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		event varchar(80) NOT NULL,
+		status varchar(24) NOT NULL DEFAULT 'info',
+		subscriber_id bigint(20) unsigned NULL,
+		actor_user_id bigint(20) unsigned NULL,
+		ip_hash char(64) NULL,
+		user_agent varchar(255) NULL,
+		context longtext NULL,
+		created_at datetime NOT NULL,
+		PRIMARY KEY  (id),
+		KEY event (event),
+		KEY status (status),
+		KEY subscriber_id (subscriber_id),
+		KEY created_at (created_at)
+	) {$charset_collate};";
+
+	dbDelta( $audit_sql );
 
 	$lists_table            = newsletter_campaign_kit_get_lists_table();
 	$tags_table             = newsletter_campaign_kit_get_tags_table();
@@ -171,4 +197,6 @@ function newsletter_campaign_kit_maybe_upgrade() {
 add_action( 'init', 'newsletter_campaign_kit_maybe_upgrade' );
 
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/subscribers.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segments.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/admin.php';

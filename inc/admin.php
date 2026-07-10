@@ -295,6 +295,10 @@ function newsletter_campaign_kit_handle_update_subscriber_status() {
 		array( '%d' )
 	);
 
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( false === $updated ? 'newsletter_status_update_failed' : 'newsletter_status_updated', false === $updated ? 'failure' : 'success', $subscriber_id, array( 'status' => $status ) );
+	}
+
 	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit&updated=' . ( false === $updated ? 'failed' : 'success' ) ) );
 	exit;
 }
@@ -311,6 +315,9 @@ function newsletter_campaign_kit_handle_export_subscribers() {
 	check_admin_referer( 'newsletter_campaign_kit_export_subscribers' );
 
 	$subscribers = newsletter_campaign_kit_get_subscribers( array( 'limit' => 100 ) );
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( 'newsletter_export_subscribers', 'success', 0, array( 'count' => count( $subscribers ) ) );
+	}
 
 	header( 'Content-Type: text/csv; charset=utf-8' );
 	header( 'Content-Disposition: attachment; filename=newsletter-subscribers.csv' );

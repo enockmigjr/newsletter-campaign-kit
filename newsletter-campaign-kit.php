@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.4.0
+ * Version: 0.5.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.4.0' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.5.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -93,6 +93,28 @@ function newsletter_campaign_kit_get_topics_table() {
 	global $wpdb;
 
 	return $wpdb->prefix . 'newsletter_campaign_topics';
+}
+
+function newsletter_campaign_kit_get_subscriber_topics_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_subscriber_topics';
+}
+
+function newsletter_campaign_kit_get_suppressions_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_suppressions';
+}
+
+/** Return whether one plugin table exists in the current site. */
+function newsletter_campaign_kit_table_exists( $table_name ) {
+	global $wpdb;
+
+	$table_name = sanitize_text_field( $table_name );
+	$found      = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) );
+
+	return $found === $table_name;
 }
 /**
  * Install or upgrade plugin storage and capabilities.
@@ -201,6 +223,8 @@ function newsletter_campaign_kit_activate() {
 	$subscriber_tags_table  = newsletter_campaign_kit_get_subscriber_tags_table();
 	$segments_table         = newsletter_campaign_kit_get_segments_table();
 	$topics_table           = newsletter_campaign_kit_get_topics_table();
+	$subscriber_topics_table = newsletter_campaign_kit_get_subscriber_topics_table();
+	$suppressions_table      = newsletter_campaign_kit_get_suppressions_table();
 
 	$lists_sql = "CREATE TABLE {$lists_table} (
 		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -271,12 +295,39 @@ function newsletter_campaign_kit_activate() {
 		KEY status (status)
 	) {$charset_collate};";
 
+	$subscriber_topics_sql = "CREATE TABLE {$subscriber_topics_table} (
+		subscriber_id bigint(20) unsigned NOT NULL,
+		topic_id bigint(20) unsigned NOT NULL,
+		status varchar(24) NOT NULL DEFAULT 'subscribed',
+		updated_at datetime NOT NULL,
+		PRIMARY KEY  (subscriber_id, topic_id),
+		KEY topic_status (topic_id, status)
+	) {$charset_collate};";
+
+	$suppressions_sql = "CREATE TABLE {$suppressions_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		email_hash char(64) NOT NULL,
+		subscriber_id bigint(20) unsigned NULL,
+		status varchar(24) NOT NULL DEFAULT 'active',
+		reason varchar(40) NOT NULL DEFAULT 'manual',
+		source varchar(100) NOT NULL DEFAULT 'admin',
+		created_at datetime NOT NULL,
+		updated_at datetime NOT NULL,
+		released_at datetime NULL,
+		PRIMARY KEY  (id),
+		UNIQUE KEY email_hash (email_hash),
+		KEY status_reason (status, reason),
+		KEY subscriber_id (subscriber_id)
+	) {$charset_collate};";
+
 	dbDelta( $lists_sql );
 	dbDelta( $tags_sql );
 	dbDelta( $subscriber_lists_sql );
 	dbDelta( $subscriber_tags_sql );
 	dbDelta( $segments_sql );
 	dbDelta( $topics_sql );
+	dbDelta( $subscriber_topics_sql );
+	dbDelta( $suppressions_sql );
 
 	$admin = get_role( 'administrator' );
 	if ( $admin ) {
@@ -311,9 +362,11 @@ function newsletter_campaign_kit_maybe_upgrade() {
 }
 add_action( 'init', 'newsletter_campaign_kit_maybe_upgrade' );
 
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/suppressions.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/subscribers.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segments.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segment-engine.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/preferences.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/campaigns.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/providers.php';
@@ -321,3 +374,4 @@ require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/queue.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/scheduler.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/reports.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/admin.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/privacy.php';

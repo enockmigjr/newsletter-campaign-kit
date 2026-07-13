@@ -128,9 +128,9 @@ function newsletter_campaign_kit_render_settings_page() {
 function newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber ) {
 	$body = isset( $campaign['body'] ) ? (string) $campaign['body'] : '';
 	$body = '' !== trim( $body ) ? $body : '<p>' . esc_html( $campaign['subject'] ) . '</p>';
-	$url  = function_exists( 'newsletter_campaign_kit_get_unsubscribe_url' ) ? newsletter_campaign_kit_get_unsubscribe_url( $subscriber['unsubscribe_token'] ) : '';
+	$url  = function_exists( 'newsletter_campaign_kit_get_preferences_url' ) ? newsletter_campaign_kit_get_preferences_url( $subscriber['unsubscribe_token'] ) : '';
 	if ( $url ) {
-		$body .= '<p><a href="' . esc_url( $url ) . '">' . esc_html__( 'Unsubscribe', 'newsletter-campaign-kit' ) . '</a></p>';
+		$body .= '<p><a href="' . esc_url( $url ) . '">' . esc_html__( 'Manage preferences or unsubscribe', 'newsletter-campaign-kit' ) . '</a></p>';
 	}
 
 	return wp_kses_post( $body );
@@ -172,6 +172,10 @@ function newsletter_campaign_kit_send_with_wp_mail( $current_result, $campaign, 
 
 	if ( empty( $subscriber['email'] ) || ! is_email( $subscriber['email'] ) ) {
 		return new WP_Error( 'newsletter_invalid_recipient', __( 'Recipient email is invalid.', 'newsletter-campaign-kit' ) );
+	}
+	$ineligibility_reason = function_exists( 'newsletter_campaign_kit_get_recipient_ineligibility_reason' ) ? newsletter_campaign_kit_get_recipient_ineligibility_reason( $subscriber, $campaign ) : '';
+	if ( '' !== $ineligibility_reason ) {
+		return new WP_Error( 'newsletter_recipient_ineligible', __( 'The recipient is no longer eligible for this campaign.', 'newsletter-campaign-kit' ), array( 'reason' => $ineligibility_reason ) );
 	}
 
 	$subject = isset( $campaign['subject'] ) ? sanitize_text_field( $campaign['subject'] ) : '';

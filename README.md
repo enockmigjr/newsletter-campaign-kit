@@ -14,6 +14,9 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Affecter ou retirer des abonnes aux listes et tags depuis l'administration.
 - Construire des segments dynamiques `all`/`any` selon listes, tags, source et date d'inscription.
 - Classer les campagnes avec des thematiques reutilisables.
+- Permettre a chaque abonne de choisir ses thematiques dans un centre public protege par token et nonce.
+- Exclure les opt-out thematiques et suppressions a la resolution d'audience puis juste avant le provider.
+- Conserver une suppression durable par HMAC apres suppression ou re-import du contact, avec levee admin explicite sans reabonnement automatique.
 - Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
 - Executer une queue batch avec verrou atomique, reprise des verrous expires et retry/backoff.
 - Programmer les campagnes dans le fuseau WordPress et les declencher chaque minute via WP-Cron.
@@ -21,6 +24,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Configurer un provider `wp_mail` ou un adaptateur externe via filtre WordPress.
 - Afficher un reporting de livraison par campagne depuis la queue.
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
+- Integrer les exports, effacements et le guide de confidentialite natifs de WordPress.
 
 ## Capabilities
 
@@ -42,6 +46,8 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `{$wpdb->prefix}newsletter_campaign_subscriber_tags`
 - `{$wpdb->prefix}newsletter_campaign_segments`
 - `{$wpdb->prefix}newsletter_campaign_topics`
+- `{$wpdb->prefix}newsletter_campaign_subscriber_topics`
+- `{$wpdb->prefix}newsletter_campaign_suppressions`
 - `{$wpdb->prefix}newsletter_campaign_audit`
 - `{$wpdb->prefix}newsletter_campaign_campaigns`
 - `{$wpdb->prefix}newsletter_campaign_queue`
@@ -59,7 +65,14 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 - `admin_post_newsletter_campaign_kit_subscribe`
 - `admin_post_nopriv_newsletter_campaign_kit_unsubscribe`
 - `admin_post_newsletter_campaign_kit_unsubscribe`
+- `admin_post_nopriv_newsletter_campaign_kit_preferences`
+- `admin_post_newsletter_campaign_kit_preferences`
+- `admin_post_nopriv_newsletter_campaign_kit_update_preferences`
+- `admin_post_newsletter_campaign_kit_update_preferences`
+- `admin_post_nopriv_newsletter_campaign_kit_confirm_unsubscribe`
+- `admin_post_newsletter_campaign_kit_confirm_unsubscribe`
 - `admin_post_newsletter_campaign_kit_update_subscriber_status`
+- `admin_post_newsletter_campaign_kit_release_suppression`
 - `admin_post_newsletter_campaign_kit_export_subscribers`
 - `admin_post_newsletter_campaign_kit_create_list`
 - `admin_post_newsletter_campaign_kit_create_tag`
@@ -92,6 +105,16 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 16. Executer `php tests/unsubscribe.php` pour valider jetons opaques, rotation, corps POST et en-tetes RFC 8058.
 17. Executer `wp eval-file tests/runtime-unsubscribe.php` dans WordPress pour verifier endpoint POST, idempotence, suppression avant envoi et remise `wp_mail`.
 18. Inspecter un email reel chez le provider afin de confirmer HTTPS, les deux en-tetes et leur couverture par la signature DKIM.
+19. Executer `wp eval-file tests/runtime-preferences.php` pour verifier GET non mutatif, CSRF, preferences thematiques, fail-closed provider, suppression durable et outils Privacy.
+
+## Hooks publics
+
+- `newsletter_campaign_kit_consent_text`: personnalise le texte de consentement du projet integrateur.
+- `newsletter_campaign_kit_suppression_reasons`: etend les motifs acceptes par les providers de bounce/complaint.
+- `newsletter_campaign_kit_send_email`: branche un provider externe sans stocker ses secrets dans le plugin.
+- `wp_privacy_personal_data_exporters` et `wp_privacy_personal_data_erasers`: exportent ou effacent les donnees identifiantes de l'abonne.
+
+La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppression active doit continuer a bloquer les remises. Le registre ne contient pas l'adresse brute. Sa levee place un contact encore present en statut `unsubscribed`; elle ne constitue jamais un consentement.
 
 ## Reste majeur
 
@@ -100,7 +123,7 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 - Templates reutilisables avances et previsualisation email.
 - Provider API externe avance avec secrets hors Git.
 - Provider abstraction SMTP/API.
-- Preferences de desinscription thematiques et registre de suppression durable pour imports, bounces et complaints.
+- Webhooks signes pour automatiser bounces et complaints vers le registre de suppression.
 - Tracking ouvertures/clics et exports de reporting avances.
 
 ## References officielles
@@ -109,4 +132,7 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 - [WordPress Code Reference - wp_schedule_event](https://developer.wordpress.org/reference/functions/wp_schedule_event/)
 - [WordPress Code Reference - wp_clear_scheduled_hook](https://developer.wordpress.org/reference/functions/wp_clear_scheduled_hook/)
 - [WordPress Code Reference - wp_mail](https://developer.wordpress.org/reference/functions/wp_mail/)
+- [WordPress Plugin Handbook - Privacy](https://developer.wordpress.org/plugins/privacy/)
+- [WordPress Personal Data Eraser](https://developer.wordpress.org/plugins/privacy/adding-the-personal-data-eraser-to-your-plugin/)
+- [WordPress Nonces](https://developer.wordpress.org/apis/security/nonces/)
 - [RFC 8058 - Signaling One-Click Functionality for List Email Headers](https://www.rfc-editor.org/rfc/rfc8058.html)

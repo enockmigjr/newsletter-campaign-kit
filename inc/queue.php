@@ -24,20 +24,23 @@ function newsletter_campaign_kit_get_campaign_recipients( $campaign ) {
 	$subscribers_table = newsletter_campaign_kit_get_subscribers_table();
 	$list_id           = ! empty( $campaign['target_list_id'] ) ? absint( $campaign['target_list_id'] ) : 0;
 	$segment_id        = ! empty( $campaign['target_segment_id'] ) ? absint( $campaign['target_segment_id'] ) : 0;
+	$topic_id          = ! empty( $campaign['topic_id'] ) ? absint( $campaign['topic_id'] ) : 0;
 
 	if ( $segment_id && function_exists( 'newsletter_campaign_kit_get_segment_recipients' ) ) {
-		return newsletter_campaign_kit_get_segment_recipients( $segment_id );
+		return newsletter_campaign_kit_filter_campaign_recipients( newsletter_campaign_kit_get_segment_recipients( $segment_id ), $topic_id );
 	}
 
 	if ( $list_id && function_exists( 'newsletter_campaign_kit_get_subscriber_lists_table' ) ) {
 		$map_table = newsletter_campaign_kit_get_subscriber_lists_table();
 		if ( function_exists( 'newsletter_campaign_kit_table_exists' ) && newsletter_campaign_kit_table_exists( $map_table ) ) {
 			$sql = "SELECT s.id, s.email, s.email_hash, s.unsubscribe_token FROM {$subscribers_table} s INNER JOIN {$map_table} sl ON sl.subscriber_id = s.id WHERE s.status = %s AND sl.list_id = %d ORDER BY s.id ASC";
-			return $wpdb->get_results( $wpdb->prepare( $sql, 'subscribed', $list_id ), ARRAY_A );
+			$recipients = $wpdb->get_results( $wpdb->prepare( $sql, 'subscribed', $list_id ), ARRAY_A );
+			return newsletter_campaign_kit_filter_campaign_recipients( $recipients, $topic_id );
 		}
 	}
 
-	return $wpdb->get_results( $wpdb->prepare( "SELECT id, email, email_hash, unsubscribe_token FROM {$subscribers_table} WHERE status = %s ORDER BY id ASC", 'subscribed' ), ARRAY_A );
+	$recipients = $wpdb->get_results( $wpdb->prepare( "SELECT id, email, email_hash, unsubscribe_token FROM {$subscribers_table} WHERE status = %s ORDER BY id ASC", 'subscribed' ), ARRAY_A );
+	return newsletter_campaign_kit_filter_campaign_recipients( $recipients, $topic_id );
 }
 
 function newsletter_campaign_kit_enqueue_campaign( $campaign_id ) {
@@ -199,12 +202,13 @@ function newsletter_campaign_kit_process_queue_batch( $limit = 20 ) {
 		$send       = new WP_Error( 'newsletter_no_provider', __( 'No newsletter provider is configured yet.', 'newsletter-campaign-kit' ) );
 
 		if ( $campaign && $subscriber ) {
-			if ( 'subscribed' === $subscriber['status'] ) {
+			$ineligibility_reason = newsletter_campaign_kit_get_recipient_ineligibility_reason( $subscriber, $campaign );
+			if ( '' === $ineligibility_reason ) {
 				$send = apply_filters( 'newsletter_campaign_kit_send_email', $send, $campaign, $subscriber, $item );
 			} else {
 				$wpdb->update(
 					$queue_table,
-					array( 'status' => 'cancelled', 'locked_at' => null, 'last_error' => '', 'updated_at' => $now ),
+					array( 'status' => 'cancelled', 'locked_at' => null, 'last_error' => $ineligibility_reason, 'updated_at' => $now ),
 					array( 'id' => $item_id ),
 					array( '%s', '%s', '%s', '%s' ),
 					array( '%d' )

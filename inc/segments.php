@@ -9,15 +9,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-function newsletter_campaign_kit_table_exists( $table_name ) {
-	global $wpdb;
-
-	$table_name = sanitize_text_field( $table_name );
-	$found      = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) );
-
-	return $found === $table_name;
-}
-
 function newsletter_campaign_kit_segments_tables_exist() {
 	return newsletter_campaign_kit_table_exists( newsletter_campaign_kit_get_lists_table() )
 		&& newsletter_campaign_kit_table_exists( newsletter_campaign_kit_get_tags_table() )

@@ -129,6 +129,17 @@ function newsletter_campaign_kit_unsubscribe_by_token( $token ) {
 	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
 		newsletter_campaign_kit_log_event( 'newsletter_unsubscribe', 'success', (int) $subscriber['id'] );
 	}
+	if ( newsletter_campaign_kit_table_exists( newsletter_campaign_kit_get_queue_table() ) ) {
+		$queue = newsletter_campaign_kit_get_queue_table();
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$queue} SET status = 'cancelled', locked_at = NULL, last_error = %s, updated_at = %s WHERE subscriber_id = %d AND status IN ('pending','processing','paused')",
+				'not_subscribed',
+				current_time( 'mysql', true ),
+				(int) $subscriber['id']
+			)
+		);
+	}
 
 	return true;
 }
@@ -174,7 +185,7 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 	}
 
 	$table_name = newsletter_campaign_kit_get_subscribers_table();
-	$email_hash = hash_hmac( 'sha256', strtolower( $email ), wp_salt( 'auth' ) );
+	$email_hash = newsletter_campaign_kit_hash_email( $email );
 	$now        = current_time( 'mysql', true );
 	$user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ), 0, 255 ) : '';
 
@@ -186,7 +197,7 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 		ARRAY_A
 	);
 
-	if ( $existing && 'suppressed' === $existing['status'] ) {
+	if ( newsletter_campaign_kit_is_email_hash_suppressed( $email_hash ) || ( $existing && 'suppressed' === $existing['status'] ) ) {
 		return new WP_Error( 'email_suppressed', __( 'This address cannot be subscribed.', 'newsletter-campaign-kit' ) );
 	}
 
@@ -270,7 +281,7 @@ function newsletter_campaign_kit_handle_subscribe() {
 
 	$email        = isset( $_POST['newsletter_email'] ) ? sanitize_email( wp_unslash( $_POST['newsletter_email'] ) ) : '';
 	$source       = isset( $_POST['newsletter_source'] ) ? sanitize_key( wp_unslash( $_POST['newsletter_source'] ) ) : 'front_footer';
-	$consent_text = __( 'I agree to receive PhotoVault editorial updates.', 'newsletter-campaign-kit' );
+	$consent_text = apply_filters( 'newsletter_campaign_kit_consent_text', __( 'I agree to receive editorial updates.', 'newsletter-campaign-kit' ), $source );
 	$result       = newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text );
 
 	if ( is_wp_error( $result ) ) {
@@ -320,9 +331,7 @@ function newsletter_campaign_kit_handle_unsubscribe() {
 		exit;
 	}
 
-	$result = newsletter_campaign_kit_unsubscribe_by_token( $token );
-	$status = is_wp_error( $result ) ? 'unsubscribe_invalid' : 'unsubscribed';
-	wp_safe_redirect( add_query_arg( 'newsletter', $status, home_url( '/' ) ) );
+	wp_safe_redirect( newsletter_campaign_kit_get_preferences_url( $token ) );
 	exit;
 }
 add_action( 'admin_post_nopriv_newsletter_campaign_kit_unsubscribe', 'newsletter_campaign_kit_handle_unsubscribe' );

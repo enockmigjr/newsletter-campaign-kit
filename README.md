@@ -9,6 +9,9 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Permettre la desinscription publique par token sans exposer l'email dans l'URL.
 - Fournir une premiere UI admin pour consulter, filtrer, changer le statut et exporter les abonnes.
 - Creer des listes et tags de segmentation avec liaisons abonnes/listes/tags.
+- Affecter ou retirer des abonnes aux listes et tags depuis l'administration.
+- Construire des segments dynamiques `all`/`any` selon listes, tags, source et date d'inscription.
+- Classer les campagnes avec des thematiques reutilisables.
 - Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
 - Executer une queue batch avec verrou atomique, reprise des verrous expires et retry/backoff.
 - Programmer les campagnes dans le fuseau WordPress et les declencher chaque minute via WP-Cron.
@@ -35,6 +38,8 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `{$wpdb->prefix}newsletter_campaign_tags`
 - `{$wpdb->prefix}newsletter_campaign_subscriber_lists`
 - `{$wpdb->prefix}newsletter_campaign_subscriber_tags`
+- `{$wpdb->prefix}newsletter_campaign_segments`
+- `{$wpdb->prefix}newsletter_campaign_topics`
 - `{$wpdb->prefix}newsletter_campaign_audit`
 - `{$wpdb->prefix}newsletter_campaign_campaigns`
 - `{$wpdb->prefix}newsletter_campaign_queue`
@@ -54,6 +59,9 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `admin_post_newsletter_campaign_kit_export_subscribers`
 - `admin_post_newsletter_campaign_kit_create_list`
 - `admin_post_newsletter_campaign_kit_create_tag`
+- `admin_post_newsletter_campaign_kit_create_segment`
+- `admin_post_newsletter_campaign_kit_create_topic`
+- `admin_post_newsletter_campaign_kit_update_assignment`
 - `admin_post_newsletter_campaign_kit_create_campaign`
 - `admin_post_newsletter_campaign_kit_transition_campaign`
 - `admin_post_newsletter_campaign_kit_schedule_campaign`
@@ -75,9 +83,12 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 11. Verifier que les reports exigent newsletter_view_reports et n'inventent pas ouvertures/clics sans tracking.
 12. Verifier que le hook `newsletter_campaign_kit_run_scheduled` est unique, traite une campagne echue et ne cree pas deux lignes pour un meme couple campagne/abonne.
 13. Executer `php tests/schedule-date.php` pour valider les dates impossibles, passees et futures.
+14. Executer `php tests/segment-engine.php` et verifier les modes all/any, les dates persistantes et les placeholders SQL.
+15. Verifier qu'une campagne cible exactement les abonnes du segment et qu'un second enqueue ne duplique aucune ligne.
 
 ## Reste majeur
 
+- Edition, duplication, archivage et preview du nombre de destinataires pour les segments.
 - Imports/exports avances de listes, tags et segments.
 - Templates reutilisables avances et previsualisation email.
 - Provider API externe avance avec secrets hors Git.

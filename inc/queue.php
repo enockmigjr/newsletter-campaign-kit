@@ -23,6 +23,11 @@ function newsletter_campaign_kit_get_campaign_recipients( $campaign ) {
 
 	$subscribers_table = newsletter_campaign_kit_get_subscribers_table();
 	$list_id           = ! empty( $campaign['target_list_id'] ) ? absint( $campaign['target_list_id'] ) : 0;
+	$segment_id        = ! empty( $campaign['target_segment_id'] ) ? absint( $campaign['target_segment_id'] ) : 0;
+
+	if ( $segment_id && function_exists( 'newsletter_campaign_kit_get_segment_recipients' ) ) {
+		return newsletter_campaign_kit_get_segment_recipients( $segment_id );
+	}
 
 	if ( $list_id && function_exists( 'newsletter_campaign_kit_get_subscriber_lists_table' ) ) {
 		$map_table = newsletter_campaign_kit_get_subscriber_lists_table();

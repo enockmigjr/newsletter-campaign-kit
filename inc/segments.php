@@ -107,6 +107,30 @@ function newsletter_campaign_kit_assign_subscriber_to_list( $subscriber_id, $lis
 	);
 }
 
+function newsletter_campaign_kit_assign_subscriber_to_tag( $subscriber_id, $tag_id ) {
+	global $wpdb;
+
+	$subscriber_id = absint( $subscriber_id );
+	$tag_id        = absint( $tag_id );
+	if ( ! $subscriber_id || ! $tag_id ) {
+		return false;
+	}
+
+	$table = newsletter_campaign_kit_get_subscriber_tags_table();
+	if ( ! newsletter_campaign_kit_table_exists( $table ) ) {
+		return false;
+	}
+
+	return false !== $wpdb->query(
+		$wpdb->prepare(
+			"INSERT IGNORE INTO {$table} (subscriber_id, tag_id, created_at) VALUES (%d, %d, %s)",
+			$subscriber_id,
+			$tag_id,
+			current_time( 'mysql', true )
+		)
+	);
+}
+
 function newsletter_campaign_kit_get_lists() {
 	global $wpdb;
 
@@ -219,6 +243,9 @@ function newsletter_campaign_kit_render_segments_page() {
 
 	$lists = newsletter_campaign_kit_get_lists();
 	$tags  = newsletter_campaign_kit_get_tags();
+	$segments = function_exists( 'newsletter_campaign_kit_get_segments' ) ? newsletter_campaign_kit_get_segments() : array();
+	$topics   = function_exists( 'newsletter_campaign_kit_get_topics' ) ? newsletter_campaign_kit_get_topics() : array();
+	$subscribers = function_exists( 'newsletter_campaign_kit_get_subscribers' ) ? newsletter_campaign_kit_get_subscribers( array( 'limit' => 100 ) ) : array();
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Lists & segments', 'newsletter-campaign-kit' ); ?></h1>
@@ -252,6 +279,77 @@ function newsletter_campaign_kit_render_segments_page() {
 			</section>
 		</div>
 
+		<section class="nck-panel">
+			<h2><?php esc_html_e( 'Assign subscriber audiences', 'newsletter-campaign-kit' ); ?></h2>
+			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-assignment-form">
+				<input type="hidden" name="action" value="newsletter_campaign_kit_update_assignment">
+				<?php wp_nonce_field( 'newsletter_campaign_kit_update_assignment' ); ?>
+				<select name="subscriber_id" required>
+					<option value=""><?php esc_html_e( 'Select subscriber', 'newsletter-campaign-kit' ); ?></option>
+					<?php foreach ( $subscribers as $subscriber ) : ?><option value="<?php echo esc_attr( $subscriber['id'] ); ?>"><?php echo esc_html( $subscriber['email'] ); ?></option><?php endforeach; ?>
+				</select>
+				<select name="audience" required>
+					<option value=""><?php esc_html_e( 'Select list or tag', 'newsletter-campaign-kit' ); ?></option>
+					<?php foreach ( $lists as $list ) : ?><option value="<?php echo esc_attr( 'list:' . $list['id'] ); ?>"><?php echo esc_html( sprintf( __( 'List: %s', 'newsletter-campaign-kit' ), $list['name'] ) ); ?></option><?php endforeach; ?>
+					<?php foreach ( $tags as $tag ) : ?><option value="<?php echo esc_attr( 'tag:' . $tag['id'] ); ?>"><?php echo esc_html( sprintf( __( 'Tag: %s', 'newsletter-campaign-kit' ), $tag['name'] ) ); ?></option><?php endforeach; ?>
+				</select>
+				<select name="assignment_operation">
+					<option value="add"><?php esc_html_e( 'Add', 'newsletter-campaign-kit' ); ?></option>
+					<option value="remove"><?php esc_html_e( 'Remove', 'newsletter-campaign-kit' ); ?></option>
+				</select>
+				<button class="button button-primary" type="submit"><?php esc_html_e( 'Update assignment', 'newsletter-campaign-kit' ); ?></button>
+			</form>
+		</section>
+
+		<div class="nck-layout">
+			<section class="nck-panel">
+				<h2><?php esc_html_e( 'Create dynamic segment', 'newsletter-campaign-kit' ); ?></h2>
+				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="hidden" name="action" value="newsletter_campaign_kit_create_segment">
+					<?php wp_nonce_field( 'newsletter_campaign_kit_create_segment' ); ?>
+					<p><input class="regular-text" name="segment_name" required maxlength="120" placeholder="<?php esc_attr_e( 'Active portrait collectors', 'newsletter-campaign-kit' ); ?>"></p>
+					<p><textarea class="large-text" name="segment_description" rows="2" placeholder="<?php esc_attr_e( 'Purpose of this dynamic audience.', 'newsletter-campaign-kit' ); ?>"></textarea></p>
+					<p>
+						<label><?php esc_html_e( 'Match', 'newsletter-campaign-kit' ); ?>
+						<select name="segment_match_type">
+							<option value="all"><?php esc_html_e( 'All selected conditions', 'newsletter-campaign-kit' ); ?></option>
+							<option value="any"><?php esc_html_e( 'Any selected condition', 'newsletter-campaign-kit' ); ?></option>
+						</select></label>
+					</p>
+					<p>
+						<label><?php esc_html_e( 'Lists', 'newsletter-campaign-kit' ); ?><br>
+						<select name="segment_list_ids[]" multiple size="4">
+							<?php foreach ( $lists as $list ) : ?><option value="<?php echo esc_attr( $list['id'] ); ?>"><?php echo esc_html( $list['name'] ); ?></option><?php endforeach; ?>
+						</select></label>
+					</p>
+					<p>
+						<label><?php esc_html_e( 'Tags', 'newsletter-campaign-kit' ); ?><br>
+						<select name="segment_tag_ids[]" multiple size="4">
+							<?php foreach ( $tags as $tag ) : ?><option value="<?php echo esc_attr( $tag['id'] ); ?>"><?php echo esc_html( $tag['name'] ); ?></option><?php endforeach; ?>
+						</select></label>
+					</p>
+					<p><label><?php esc_html_e( 'Subscription sources', 'newsletter-campaign-kit' ); ?><br><input class="regular-text" name="segment_sources" placeholder="front_footer, checkout"></label></p>
+					<p>
+						<label><?php esc_html_e( 'Subscribed after', 'newsletter-campaign-kit' ); ?> <input type="date" name="segment_created_after"></label>
+						<label><?php esc_html_e( 'Subscribed before', 'newsletter-campaign-kit' ); ?> <input type="date" name="segment_created_before"></label>
+					</p>
+					<?php submit_button( __( 'Create segment', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
+				</form>
+			</section>
+
+			<section class="nck-panel">
+				<h2><?php esc_html_e( 'Create campaign topic', 'newsletter-campaign-kit' ); ?></h2>
+				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="hidden" name="action" value="newsletter_campaign_kit_create_topic">
+					<?php wp_nonce_field( 'newsletter_campaign_kit_create_topic' ); ?>
+					<p><input class="regular-text" name="topic_name" required maxlength="100" placeholder="<?php esc_attr_e( 'Portraits, exhibitions, private archives...', 'newsletter-campaign-kit' ); ?>"></p>
+					<p><textarea class="large-text" name="topic_description" rows="3" placeholder="<?php esc_attr_e( 'Editorial scope of this topic.', 'newsletter-campaign-kit' ); ?>"></textarea></p>
+					<p><input type="color" name="topic_color" value="#111827"></p>
+					<?php submit_button( __( 'Create topic', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
+				</form>
+			</section>
+		</div>
+
 		<h2><?php esc_html_e( 'Lists', 'newsletter-campaign-kit' ); ?></h2>
 		<table class="widefat fixed striped"><thead><tr><th><?php esc_html_e( 'Name', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Slug', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subscribers', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Description', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
 		<?php if ( empty( $lists ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No list yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
@@ -263,7 +361,27 @@ function newsletter_campaign_kit_render_segments_page() {
 		<?php if ( empty( $tags ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No tag yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
 		<?php foreach ( $tags as $tag ) : ?><tr><td><?php echo esc_html( $tag['name'] ); ?></td><td><code><?php echo esc_html( $tag['slug'] ); ?></code></td><td><?php echo esc_html( number_format_i18n( (int) $tag['subscribers_count'] ) ); ?></td><td><span class="nck-color" style="background:<?php echo esc_attr( $tag['color'] ); ?>"></span><?php echo esc_html( $tag['color'] ); ?></td></tr><?php endforeach; ?>
 		</tbody></table>
+
+		<h2><?php esc_html_e( 'Dynamic segments', 'newsletter-campaign-kit' ); ?></h2>
+		<table class="widefat fixed striped"><thead><tr><th><?php esc_html_e( 'Name', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Mode', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Rules', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Description', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
+		<?php if ( empty( $segments ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No dynamic segment yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
+		<?php foreach ( $segments as $segment ) : ?>
+			<?php $rules = json_decode( $segment['rules'], true ); ?>
+			<tr>
+				<td><strong><?php echo esc_html( $segment['name'] ); ?></strong><br><code><?php echo esc_html( $segment['slug'] ); ?></code></td>
+				<td><?php echo esc_html( 'any' === $segment['match_type'] ? __( 'Any', 'newsletter-campaign-kit' ) : __( 'All', 'newsletter-campaign-kit' ) ); ?></td>
+				<td><?php echo esc_html( sprintf( __( '%1$d lists, %2$d tags, %3$d sources', 'newsletter-campaign-kit' ), count( isset( $rules['list_ids'] ) ? $rules['list_ids'] : array() ), count( isset( $rules['tag_ids'] ) ? $rules['tag_ids'] : array() ), count( isset( $rules['sources'] ) ? $rules['sources'] : array() ) ) ); ?></td>
+				<td><?php echo esc_html( $segment['description'] ); ?></td>
+			</tr>
+		<?php endforeach; ?>
+		</tbody></table>
+
+		<h2><?php esc_html_e( 'Campaign topics', 'newsletter-campaign-kit' ); ?></h2>
+		<table class="widefat fixed striped"><thead><tr><th><?php esc_html_e( 'Name', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Slug', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Color', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Description', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
+		<?php if ( empty( $topics ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No campaign topic yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
+		<?php foreach ( $topics as $topic ) : ?><tr><td><?php echo esc_html( $topic['name'] ); ?></td><td><code><?php echo esc_html( $topic['slug'] ); ?></code></td><td><span class="nck-color" style="background:<?php echo esc_attr( $topic['color'] ); ?>"></span><?php echo esc_html( $topic['color'] ); ?></td><td><?php echo esc_html( $topic['description'] ); ?></td></tr><?php endforeach; ?>
+		</tbody></table>
 	</div>
-	<style>.newsletter-campaign-kit-admin .nck-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.newsletter-campaign-kit-admin .nck-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:16px}.newsletter-campaign-kit-admin .nck-color{display:inline-block;width:14px;height:14px;border-radius:999px;margin-right:8px;vertical-align:-2px}@media(max-width:900px){.newsletter-campaign-kit-admin .nck-layout{grid-template-columns:1fr}}</style>
+	<style>.newsletter-campaign-kit-admin .nck-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.newsletter-campaign-kit-admin .nck-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;margin:18px 0;padding:16px}.newsletter-campaign-kit-admin .nck-assignment-form{display:flex;gap:8px;flex-wrap:wrap}.newsletter-campaign-kit-admin .nck-color{display:inline-block;width:14px;height:14px;border-radius:999px;margin-right:8px;vertical-align:-2px}@media(max-width:900px){.newsletter-campaign-kit-admin .nck-layout{grid-template-columns:1fr}.newsletter-campaign-kit-admin .nck-assignment-form{align-items:stretch;flex-direction:column}}</style>
 	<?php
 }

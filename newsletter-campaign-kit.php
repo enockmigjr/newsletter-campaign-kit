@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.2.0
+ * Version: 0.3.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.2.0' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.3.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -82,6 +82,18 @@ function newsletter_campaign_kit_get_subscriber_tags_table() {
 
 	return $wpdb->prefix . 'newsletter_campaign_subscriber_tags';
 }
+
+function newsletter_campaign_kit_get_segments_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_segments';
+}
+
+function newsletter_campaign_kit_get_topics_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_topics';
+}
 /**
  * Install or upgrade plugin storage and capabilities.
  */
@@ -143,6 +155,8 @@ function newsletter_campaign_kit_activate() {
 		body longtext NULL,
 		status varchar(32) NOT NULL DEFAULT 'draft',
 		target_list_id bigint(20) unsigned NULL,
+		target_segment_id bigint(20) unsigned NULL,
+		topic_id bigint(20) unsigned NULL,
 		scheduled_at datetime NULL,
 		sent_at datetime NULL,
 		created_by bigint(20) unsigned NULL,
@@ -153,6 +167,8 @@ function newsletter_campaign_kit_activate() {
 		UNIQUE KEY slug (slug),
 		KEY status (status),
 		KEY target_list_id (target_list_id),
+		KEY target_segment_id (target_segment_id),
+		KEY topic_id (topic_id),
 		KEY scheduled_at (scheduled_at)
 	) {$charset_collate};";
 
@@ -183,6 +199,8 @@ function newsletter_campaign_kit_activate() {
 	$tags_table             = newsletter_campaign_kit_get_tags_table();
 	$subscriber_lists_table = newsletter_campaign_kit_get_subscriber_lists_table();
 	$subscriber_tags_table  = newsletter_campaign_kit_get_subscriber_tags_table();
+	$segments_table         = newsletter_campaign_kit_get_segments_table();
+	$topics_table           = newsletter_campaign_kit_get_topics_table();
 
 	$lists_sql = "CREATE TABLE {$lists_table} (
 		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -224,10 +242,41 @@ function newsletter_campaign_kit_activate() {
 		KEY tag_id (tag_id)
 	) {$charset_collate};";
 
+	$segments_sql = "CREATE TABLE {$segments_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		name varchar(120) NOT NULL,
+		slug varchar(140) NOT NULL,
+		description text NULL,
+		match_type varchar(8) NOT NULL DEFAULT 'all',
+		rules longtext NOT NULL,
+		status varchar(24) NOT NULL DEFAULT 'active',
+		created_at datetime NOT NULL,
+		updated_at datetime NOT NULL,
+		PRIMARY KEY  (id),
+		UNIQUE KEY slug (slug),
+		KEY status (status)
+	) {$charset_collate};";
+
+	$topics_sql = "CREATE TABLE {$topics_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		name varchar(100) NOT NULL,
+		slug varchar(120) NOT NULL,
+		description text NULL,
+		color varchar(16) NOT NULL DEFAULT '#111827',
+		status varchar(24) NOT NULL DEFAULT 'active',
+		created_at datetime NOT NULL,
+		updated_at datetime NOT NULL,
+		PRIMARY KEY  (id),
+		UNIQUE KEY slug (slug),
+		KEY status (status)
+	) {$charset_collate};";
+
 	dbDelta( $lists_sql );
 	dbDelta( $tags_sql );
 	dbDelta( $subscriber_lists_sql );
 	dbDelta( $subscriber_tags_sql );
+	dbDelta( $segments_sql );
+	dbDelta( $topics_sql );
 
 	$admin = get_role( 'administrator' );
 	if ( $admin ) {
@@ -264,6 +313,7 @@ add_action( 'init', 'newsletter_campaign_kit_maybe_upgrade' );
 
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/subscribers.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segments.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segment-engine.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/campaigns.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/providers.php';

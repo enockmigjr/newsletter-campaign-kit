@@ -38,13 +38,25 @@ function newsletter_campaign_kit_get_request_ip_hash() {
 
 
 /**
- * Create a stable non-secret unsubscribe token for an email hash.
+ * Create an opaque unsubscribe token.
  *
  * @param string $email_hash Email HMAC hash.
  * @return string
  */
 function newsletter_campaign_kit_create_unsubscribe_token( $email_hash ) {
-	return hash_hmac( 'sha256', sanitize_text_field( $email_hash ), wp_salt( 'secure_auth' ) );
+	$entropy = wp_generate_password( 64, true, true );
+
+	return hash_hmac( 'sha256', sanitize_text_field( $email_hash ) . '|' . $entropy, wp_salt( 'secure_auth' ) );
+}
+
+/**
+ * Check the shape of an unsubscribe capability token.
+ *
+ * @param string $token Unsubscribe token.
+ * @return bool
+ */
+function newsletter_campaign_kit_is_valid_unsubscribe_token( $token ) {
+	return 1 === preg_match( '/^[a-f0-9]{64}$/', (string) $token );
 }
 
 /**
@@ -61,6 +73,88 @@ function newsletter_campaign_kit_get_unsubscribe_url( $token ) {
 		),
 		admin_url( 'admin-post.php' )
 	);
+}
+
+/**
+ * Unsubscribe a recipient through an opaque capability token.
+ *
+ * The operation is idempotent so mailbox providers may safely retry it.
+ *
+ * @param string $token Unsubscribe token.
+ * @return true|WP_Error
+ */
+function newsletter_campaign_kit_unsubscribe_by_token( $token ) {
+	global $wpdb;
+
+	$token = sanitize_text_field( $token );
+	if ( ! newsletter_campaign_kit_is_valid_unsubscribe_token( $token ) ) {
+		return new WP_Error( 'newsletter_invalid_unsubscribe_token', __( 'The unsubscribe request is invalid.', 'newsletter-campaign-kit' ) );
+	}
+
+	$table_name = newsletter_campaign_kit_get_subscribers_table();
+	$subscriber = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT id, status FROM {$table_name} WHERE unsubscribe_token = %s LIMIT 1",
+			$token
+		),
+		ARRAY_A
+	);
+
+	if ( ! $subscriber ) {
+		return new WP_Error( 'newsletter_unknown_unsubscribe_token', __( 'The unsubscribe request is invalid.', 'newsletter-campaign-kit' ) );
+	}
+
+	if ( 'unsubscribed' === $subscriber['status'] ) {
+		return true;
+	}
+
+	$updated = $wpdb->update(
+		$table_name,
+		array(
+			'status'     => 'unsubscribed',
+			'updated_at' => current_time( 'mysql', true ),
+		),
+		array(
+			'id'                => (int) $subscriber['id'],
+			'unsubscribe_token' => $token,
+		),
+		array( '%s', '%s' ),
+		array( '%d', '%s' )
+	);
+
+	if ( false === $updated ) {
+		return new WP_Error( 'newsletter_unsubscribe_db_error', __( 'The unsubscribe request could not be saved.', 'newsletter-campaign-kit' ) );
+	}
+
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( 'newsletter_unsubscribe', 'success', (int) $subscriber['id'] );
+	}
+
+	return true;
+}
+
+/**
+ * Validate the standardized RFC 8058 POST body.
+ *
+ * @param string $method HTTP method.
+ * @param string $value  List-Unsubscribe form value.
+ * @return bool
+ */
+function newsletter_campaign_kit_is_one_click_request( $method, $value ) {
+	return 'POST' === strtoupper( (string) $method ) && 'One-Click' === (string) $value;
+}
+
+/**
+ * Return a neutral response for mailbox-provider one-click requests.
+ *
+ * @param int $status_code HTTP status code.
+ */
+function newsletter_campaign_kit_send_one_click_response( $status_code ) {
+	status_header( (int) $status_code );
+	nocache_headers();
+	header( 'Content-Type: text/plain; charset=UTF-8' );
+	echo esc_html__( 'Unsubscribe request processed.', 'newsletter-campaign-kit' );
+	exit;
 }
 
 /**
@@ -81,16 +175,24 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 
 	$table_name = newsletter_campaign_kit_get_subscribers_table();
 	$email_hash = hash_hmac( 'sha256', strtolower( $email ), wp_salt( 'auth' ) );
-	$now               = current_time( 'mysql', true );
-	$unsubscribe_token = newsletter_campaign_kit_create_unsubscribe_token( $email_hash );
+	$now        = current_time( 'mysql', true );
 	$user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ), 0, 255 ) : '';
 
-	$existing_id = $wpdb->get_var(
+	$existing = $wpdb->get_row(
 		$wpdb->prepare(
-			"SELECT id FROM {$table_name} WHERE email_hash = %s LIMIT 1",
+			"SELECT id, status, unsubscribe_token FROM {$table_name} WHERE email_hash = %s LIMIT 1",
 			$email_hash
-		)
+		),
+		ARRAY_A
 	);
+
+	if ( $existing && 'suppressed' === $existing['status'] ) {
+		return new WP_Error( 'email_suppressed', __( 'This address cannot be subscribed.', 'newsletter-campaign-kit' ) );
+	}
+
+	$unsubscribe_token = $existing && 'subscribed' === $existing['status']
+		? $existing['unsubscribe_token']
+		: newsletter_campaign_kit_create_unsubscribe_token( $email_hash );
 
 	$data = array(
 		'email'             => $email,
@@ -103,11 +205,11 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 		'updated_at'        => $now,
 	);
 
-	if ( $existing_id ) {
+	if ( $existing ) {
 		$updated = $wpdb->update(
 			$table_name,
 			$data,
-			array( 'id' => (int) $existing_id ),
+			array( 'id' => (int) $existing['id'] ),
 			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
@@ -117,11 +219,12 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 		}
 
 		if ( function_exists( 'newsletter_campaign_kit_get_default_list_id' ) ) {
-			newsletter_campaign_kit_assign_subscriber_to_list( (int) $existing_id, newsletter_campaign_kit_get_default_list_id() );
+			newsletter_campaign_kit_assign_subscriber_to_list( (int) $existing['id'], newsletter_campaign_kit_get_default_list_id() );
 		}
 
 		if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
-			newsletter_campaign_kit_log_event( 'newsletter_subscribe_reactivated', 'success', (int) $existing_id, array( 'source' => sanitize_key( $source ) ) );
+			$event = 'subscribed' === $existing['status'] ? 'newsletter_subscribe_refreshed' : 'newsletter_subscribe_reactivated';
+			newsletter_campaign_kit_log_event( $event, 'success', (int) $existing['id'], array( 'source' => sanitize_key( $source ) ) );
 		}
 
 		return true;
@@ -171,10 +274,13 @@ function newsletter_campaign_kit_handle_subscribe() {
 	$result       = newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text );
 
 	if ( is_wp_error( $result ) ) {
+		$error_code = $result->get_error_code();
 		if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
-			newsletter_campaign_kit_log_event( 'newsletter_subscribe_rejected', 'warning', 0, array( 'reason' => $result->get_error_code(), 'source' => $source ) );
+			newsletter_campaign_kit_log_event( 'newsletter_subscribe_rejected', 'warning', 0, array( 'reason' => $error_code, 'source' => $source ) );
 		}
-		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( $result->get_error_code() ) );
+		// Do not expose suppression-list membership through the public response.
+		$public_status = 'email_suppressed' === $error_code ? 'subscribed' : $error_code;
+		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( $public_status ) );
 		exit;
 	}
 
@@ -188,31 +294,34 @@ add_action( 'admin_post_newsletter_campaign_kit_subscribe', 'newsletter_campaign
  * Handle public unsubscribe requests.
  */
 function newsletter_campaign_kit_handle_unsubscribe() {
-	global $wpdb;
+	$method    = isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : 'get';
+	$post_value = isset( $_POST['List-Unsubscribe'] ) ? sanitize_text_field( wp_unslash( $_POST['List-Unsubscribe'] ) ) : '';
+	$token      = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
 
-	$token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
-	if ( ! preg_match( '/^[a-f0-9]{64}$/', $token ) ) {
+	if ( 'post' === $method ) {
+		if ( ! newsletter_campaign_kit_is_one_click_request( $method, $post_value ) || ! newsletter_campaign_kit_is_valid_unsubscribe_token( $token ) ) {
+			newsletter_campaign_kit_send_one_click_response( 400 );
+		}
+
+		$result = newsletter_campaign_kit_unsubscribe_by_token( $token );
+		if ( is_wp_error( $result ) && 'newsletter_unsubscribe_db_error' === $result->get_error_code() ) {
+			if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+				newsletter_campaign_kit_log_event( 'newsletter_unsubscribe_failed', 'failure', 0, array( 'reason' => $result->get_error_code() ) );
+			}
+			newsletter_campaign_kit_send_one_click_response( 503 );
+		}
+
+		// Unknown but well-formed tokens receive the same response to avoid enumeration.
+		newsletter_campaign_kit_send_one_click_response( 200 );
+	}
+
+	if ( 'get' !== $method || ! newsletter_campaign_kit_is_valid_unsubscribe_token( $token ) ) {
 		wp_safe_redirect( add_query_arg( 'newsletter', 'unsubscribe_invalid', home_url( '/' ) ) );
 		exit;
 	}
 
-	$table_name = newsletter_campaign_kit_get_subscribers_table();
-	$updated    = $wpdb->update(
-		$table_name,
-		array(
-			'status'     => 'unsubscribed',
-			'updated_at' => current_time( 'mysql', true ),
-		),
-		array( 'unsubscribe_token' => $token ),
-		array( '%s', '%s' ),
-		array( '%s' )
-	);
-
-	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
-		newsletter_campaign_kit_log_event( false === $updated ? 'newsletter_unsubscribe_failed' : 'newsletter_unsubscribe', false === $updated ? 'failure' : 'success' );
-	}
-
-	$status = false === $updated ? 'unsubscribe_failed' : 'unsubscribed';
+	$result = newsletter_campaign_kit_unsubscribe_by_token( $token );
+	$status = is_wp_error( $result ) ? 'unsubscribe_invalid' : 'unsubscribed';
 	wp_safe_redirect( add_query_arg( 'newsletter', $status, home_url( '/' ) ) );
 	exit;
 }

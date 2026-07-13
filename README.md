@@ -6,7 +6,9 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 
 - Capturer les abonnements newsletter avec nonce et consentement.
 - Stocker l'email, un email hash, un token de desinscription, source, consentement, IP hash et user-agent tronque.
-- Permettre la desinscription publique par token sans exposer l'email dans l'URL.
+- Permettre la desinscription publique par token opaque sans exposer l'email dans l'URL.
+- Supporter le one-click unsubscribe RFC 8058 par POST idempotent et en-tetes `List-Unsubscribe`.
+- Bloquer la reactivation publique des contacts explicitement `suppressed` et verifier leur statut avant chaque envoi.
 - Fournir une premiere UI admin pour consulter, filtrer, changer le statut et exporter les abonnes.
 - Creer des listes et tags de segmentation avec liaisons abonnes/listes/tags.
 - Affecter ou retirer des abonnes aux listes et tags depuis l'administration.
@@ -49,6 +51,8 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `newsletter_campaign_kit_version`
 - `newsletter_campaign_kit_provider_settings`
 
+Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dkim_confirmed`. Les en-tetes RFC 8058 ne sont emis que lorsque les deux sont actifs et que l'URL publique est en HTTPS. La signature DKIM doit couvrir `List-Unsubscribe` et `List-Unsubscribe-Post`; le plugin exige une confirmation explicite car `wp_mail()` ne permet pas de prouver cette couverture avant remise au transport.
+
 ## Actions admin-post
 
 - `admin_post_nopriv_newsletter_campaign_kit_subscribe`
@@ -85,6 +89,9 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 13. Executer `php tests/schedule-date.php` pour valider les dates impossibles, passees et futures.
 14. Executer `php tests/segment-engine.php` et verifier les modes all/any, les dates persistantes et les placeholders SQL.
 15. Verifier qu'une campagne cible exactement les abonnes du segment et qu'un second enqueue ne duplique aucune ligne.
+16. Executer `php tests/unsubscribe.php` pour valider jetons opaques, rotation, corps POST et en-tetes RFC 8058.
+17. Executer `wp eval-file tests/runtime-unsubscribe.php` dans WordPress pour verifier endpoint POST, idempotence, suppression avant envoi et remise `wp_mail`.
+18. Inspecter un email reel chez le provider afin de confirmer HTTPS, les deux en-tetes et leur couverture par la signature DKIM.
 
 ## Reste majeur
 
@@ -93,6 +100,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - Templates reutilisables avances et previsualisation email.
 - Provider API externe avance avec secrets hors Git.
 - Provider abstraction SMTP/API.
+- Preferences de desinscription thematiques et registre de suppression durable pour imports, bounces et complaints.
 - Tracking ouvertures/clics et exports de reporting avances.
 
 ## References officielles
@@ -100,3 +108,5 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - [WordPress Plugin Handbook - Cron](https://developer.wordpress.org/plugins/cron/)
 - [WordPress Code Reference - wp_schedule_event](https://developer.wordpress.org/reference/functions/wp_schedule_event/)
 - [WordPress Code Reference - wp_clear_scheduled_hook](https://developer.wordpress.org/reference/functions/wp_clear_scheduled_hook/)
+- [WordPress Code Reference - wp_mail](https://developer.wordpress.org/reference/functions/wp_mail/)
+- [RFC 8058 - Signaling One-Click Functionality for List Email Headers](https://www.rfc-editor.org/rfc/rfc8058.html)

@@ -108,13 +108,19 @@ function newsletter_campaign_kit_handle_create_campaign() {
 	check_admin_referer( 'newsletter_campaign_kit_create_campaign' );
 
 	$title        = isset( $_POST['campaign_title'] ) ? sanitize_text_field( wp_unslash( $_POST['campaign_title'] ) ) : '';
-	$subject      = isset( $_POST['campaign_subject'] ) ? sanitize_text_field( wp_unslash( $_POST['campaign_subject'] ) ) : '';
-	$preview_text = isset( $_POST['campaign_preview_text'] ) ? sanitize_text_field( wp_unslash( $_POST['campaign_preview_text'] ) ) : '';
-	$body         = isset( $_POST['campaign_body'] ) ? wp_kses_post( wp_unslash( $_POST['campaign_body'] ) ) : '';
+	$content      = newsletter_campaign_kit_resolve_campaign_content(
+		array(
+			'template_id' => isset( $_POST['template_id'] ) ? absint( $_POST['template_id'] ) : 0,
+			'subject' => isset( $_POST['campaign_subject'] ) ? wp_unslash( $_POST['campaign_subject'] ) : '',
+			'preview_text' => isset( $_POST['campaign_preview_text'] ) ? wp_unslash( $_POST['campaign_preview_text'] ) : '',
+			'html_body' => isset( $_POST['campaign_body'] ) ? wp_unslash( $_POST['campaign_body'] ) : '',
+			'text_body' => isset( $_POST['campaign_text_body'] ) ? wp_unslash( $_POST['campaign_text_body'] ) : '',
+		)
+	);
 	$audience     = newsletter_campaign_kit_resolve_campaign_audience( isset( $_POST['target_audience'] ) ? wp_unslash( $_POST['target_audience'] ) : 'all' );
 	$topic_id     = isset( $_POST['topic_id'] ) ? absint( $_POST['topic_id'] ) : 0;
 
-	if ( '' === $title || '' === $subject || is_wp_error( $audience ) || ! newsletter_campaign_kit_campaigns_table_exists() ) {
+	if ( '' === $title || is_wp_error( $content ) || is_wp_error( $audience ) || ! newsletter_campaign_kit_campaigns_table_exists() ) {
 		wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns&created=invalid' ) );
 		exit;
 	}
@@ -131,9 +137,11 @@ function newsletter_campaign_kit_handle_create_campaign() {
 		array(
 			'title'          => $title,
 			'slug'           => newsletter_campaign_kit_generate_unique_slug( $table, $title ),
-			'subject'        => $subject,
-			'preview_text'   => $preview_text,
-			'body'           => $body,
+			'subject'        => $content['subject'],
+			'preview_text'   => $content['preview_text'],
+			'body'           => $content['html_body'],
+			'text_body'      => $content['text_body'],
+			'template_id'    => $content['template_id'] ? $content['template_id'] : null,
 			'status'         => 'draft',
 			'target_list_id'    => $audience['target_list_id'],
 			'target_segment_id' => $audience['target_segment_id'],
@@ -143,7 +151,7 @@ function newsletter_campaign_kit_handle_create_campaign() {
 			'created_at'     => $now,
 			'updated_at'     => $now,
 		),
-		array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d', '%d', '%s', '%s' )
+		array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%d', '%d', '%d', '%s', '%s' )
 	);
 
 	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
@@ -336,6 +344,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	$lists     = function_exists( 'newsletter_campaign_kit_get_lists' ) ? newsletter_campaign_kit_get_lists() : array();
 	$segments  = function_exists( 'newsletter_campaign_kit_get_segments' ) ? newsletter_campaign_kit_get_segments() : array();
 	$topics    = function_exists( 'newsletter_campaign_kit_get_topics' ) ? newsletter_campaign_kit_get_topics() : array();
+	$templates = function_exists( 'newsletter_campaign_kit_get_templates' ) ? newsletter_campaign_kit_get_templates() : array();
 	$statuses  = newsletter_campaign_kit_get_campaign_statuses();
 	$list_labels    = array();
 	$segment_labels = array();
@@ -364,7 +373,8 @@ function newsletter_campaign_kit_render_campaigns_page() {
 				<input type="hidden" name="action" value="newsletter_campaign_kit_create_campaign">
 				<?php wp_nonce_field( 'newsletter_campaign_kit_create_campaign' ); ?>
 				<p><input class="regular-text" name="campaign_title" required maxlength="190" placeholder="<?php esc_attr_e( 'July visual letter', 'newsletter-campaign-kit' ); ?>"></p>
-				<p><input class="regular-text" name="campaign_subject" required maxlength="190" placeholder="<?php esc_attr_e( 'New archive fragments are available', 'newsletter-campaign-kit' ); ?>"></p>
+				<p><label for="nck-template-id"><?php esc_html_e( 'Start from a template', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-template-id" name="template_id"><option value="0"><?php esc_html_e( 'No template', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $templates as $template ) : ?><option value="<?php echo esc_attr( $template['id'] ); ?>"><?php echo esc_html( $template['name'] ); ?></option><?php endforeach; ?></select></p>
+				<p><input class="regular-text" name="campaign_subject" maxlength="190" placeholder="<?php esc_attr_e( 'Subject override (optional with a template)', 'newsletter-campaign-kit' ); ?>"></p>
 				<p><input class="large-text" name="campaign_preview_text" maxlength="255" placeholder="<?php esc_attr_e( 'Short inbox preview text.', 'newsletter-campaign-kit' ); ?>"></p>
 				<p>
 					<label class="screen-reader-text" for="nck-target-audience"><?php esc_html_e( 'Campaign audience', 'newsletter-campaign-kit' ); ?></label>
@@ -388,6 +398,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 					</select>
 				</p>
 				<p><textarea class="large-text" name="campaign_body" rows="8" placeholder="<?php esc_attr_e( 'Editorial body. Basic safe HTML is allowed.', 'newsletter-campaign-kit' ); ?>"></textarea></p>
+				<p><textarea class="large-text code" name="campaign_text_body" rows="6" placeholder="<?php esc_attr_e( 'Plain-text version. Generated from HTML when left empty.', 'newsletter-campaign-kit' ); ?>"></textarea></p>
 				<?php submit_button( __( 'Create draft', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 			</form>
 		</section>
@@ -415,7 +426,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 					<td><code><?php echo esc_html( isset( $statuses[ $campaign['status'] ] ) ? $statuses[ $campaign['status'] ] : $campaign['status'] ); ?></code></td>
 					<td><?php echo ! empty( $campaign['scheduled_at'] ) ? esc_html( get_date_from_gmt( $campaign['scheduled_at'], 'Y-m-d H:i' ) ) : esc_html__( 'Not scheduled', 'newsletter-campaign-kit' ); ?></td>
 					<td><?php echo esc_html( get_date_from_gmt( $campaign['updated_at'], 'Y-m-d H:i' ) ); ?></td>
-					<td><div class="nck-inline-actions"><?php newsletter_campaign_kit_render_campaign_transition_actions( $campaign ); ?></div></td>
+					<td><div class="nck-inline-actions"><a class="button button-small" target="_blank" rel="noopener" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=newsletter_campaign_kit_preview&kind=campaign&id=' . absint( $campaign['id'] ) ), 'newsletter_campaign_kit_preview_campaign_' . absint( $campaign['id'] ) ) ); ?>"><?php esc_html_e( 'Preview', 'newsletter-campaign-kit' ); ?></a><?php newsletter_campaign_kit_render_campaign_transition_actions( $campaign ); ?></div></td>
 				</tr>
 			<?php endforeach; ?>
 			</tbody>

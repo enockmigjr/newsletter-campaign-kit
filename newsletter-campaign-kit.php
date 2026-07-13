@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.5.0
+ * Version: 0.6.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.5.0' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.6.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -107,6 +107,12 @@ function newsletter_campaign_kit_get_suppressions_table() {
 	return $wpdb->prefix . 'newsletter_campaign_suppressions';
 }
 
+function newsletter_campaign_kit_get_templates_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_templates';
+}
+
 /** Return whether one plugin table exists in the current site. */
 function newsletter_campaign_kit_table_exists( $table_name ) {
 	global $wpdb;
@@ -175,6 +181,8 @@ function newsletter_campaign_kit_activate() {
 		subject varchar(190) NOT NULL,
 		preview_text varchar(255) NULL,
 		body longtext NULL,
+		text_body longtext NULL,
+		template_id bigint(20) unsigned NULL,
 		status varchar(32) NOT NULL DEFAULT 'draft',
 		target_list_id bigint(20) unsigned NULL,
 		target_segment_id bigint(20) unsigned NULL,
@@ -188,6 +196,7 @@ function newsletter_campaign_kit_activate() {
 		PRIMARY KEY  (id),
 		UNIQUE KEY slug (slug),
 		KEY status (status),
+		KEY template_id (template_id),
 		KEY target_list_id (target_list_id),
 		KEY target_segment_id (target_segment_id),
 		KEY topic_id (topic_id),
@@ -195,6 +204,27 @@ function newsletter_campaign_kit_activate() {
 	) {$charset_collate};";
 
 	dbDelta( $campaigns_sql );
+	$templates_table = newsletter_campaign_kit_get_templates_table();
+	$templates_sql   = "CREATE TABLE {$templates_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		name varchar(190) NOT NULL,
+		slug varchar(220) NOT NULL,
+		subject varchar(190) NOT NULL,
+		preview_text varchar(255) NULL,
+		html_body longtext NOT NULL,
+		text_body longtext NULL,
+		status varchar(24) NOT NULL DEFAULT 'active',
+		created_by bigint(20) unsigned NULL,
+		updated_by bigint(20) unsigned NULL,
+		created_at datetime NOT NULL,
+		updated_at datetime NOT NULL,
+		PRIMARY KEY  (id),
+		UNIQUE KEY slug (slug),
+		KEY status (status),
+		KEY updated_at (updated_at)
+	) {$charset_collate};";
+
+	dbDelta( $templates_sql );
 	$queue_table = newsletter_campaign_kit_get_queue_table();
 	$queue_sql   = "CREATE TABLE {$queue_table} (
 		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -368,6 +398,7 @@ require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segments.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segment-engine.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/preferences.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/templates.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/campaigns.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/providers.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/queue.php';

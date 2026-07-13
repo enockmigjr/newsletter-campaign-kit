@@ -136,6 +136,20 @@ function newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber ) 
 	return wp_kses_post( $body );
 }
 
+function newsletter_campaign_kit_render_campaign_text( $campaign, $subscriber ) {
+	$text = isset( $campaign['text_body'] ) ? newsletter_campaign_kit_sanitize_text_body( $campaign['text_body'] ) : '';
+	if ( '' === $text ) {
+		$html = isset( $campaign['body'] ) ? $campaign['body'] : '';
+		$text = newsletter_campaign_kit_html_to_text( $html );
+	}
+	$url = function_exists( 'newsletter_campaign_kit_get_preferences_url' ) && ! empty( $subscriber['unsubscribe_token'] ) ? newsletter_campaign_kit_get_preferences_url( $subscriber['unsubscribe_token'] ) : '';
+	if ( $url ) {
+		$text .= "\n\n" . __( 'Manage preferences or unsubscribe:', 'newsletter-campaign-kit' ) . "\n" . esc_url_raw( $url );
+	}
+
+	return trim( $text );
+}
+
 /**
  * Build RFC 8058 headers when the secure endpoint and DKIM are confirmed.
  *
@@ -191,7 +205,16 @@ function newsletter_campaign_kit_send_with_wp_mail( $current_result, $campaign, 
 	);
 	$headers    = array_merge( $headers, newsletter_campaign_kit_get_one_click_headers( $subscriber, $settings ) );
 	$message    = newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber );
-	$sent       = wp_mail( $subscriber['email'], $subject, $message, $headers );
+	$alt_body   = newsletter_campaign_kit_render_campaign_text( $campaign, $subscriber );
+	$set_alt_body = static function ( $phpmailer ) use ( $alt_body ) {
+		$phpmailer->AltBody = $alt_body;
+	};
+	add_action( 'phpmailer_init', $set_alt_body );
+	try {
+		$sent = wp_mail( $subscriber['email'], $subject, $message, $headers );
+	} finally {
+		remove_action( 'phpmailer_init', $set_alt_body );
+	}
 
 	return $sent ? true : new WP_Error( 'newsletter_wp_mail_failed', __( 'wp_mail could not deliver the message.', 'newsletter-campaign-kit' ) );
 }

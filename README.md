@@ -18,6 +18,10 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Exclure les opt-out thematiques et suppressions a la resolution d'audience puis juste avant le provider.
 - Conserver une suppression durable par HMAC apres suppression ou re-import du contact, avec levee admin explicite sans reabonnement automatique.
 - Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
+- Creer, modifier, dupliquer, archiver et restaurer des templates editoriaux reutilisables.
+- Heriter d'un template dans une campagne tout en autorisant des surcharges explicites.
+- Previsualiser les versions HTML et texte dans une page admin isolee par capability, nonce et CSP.
+- Envoyer des emails `multipart/alternative` avec `AltBody` texte via le hook PHPMailer borne a l'appel `wp_mail`.
 - Executer une queue batch avec verrou atomique, reprise des verrous expires et retry/backoff.
 - Programmer les campagnes dans le fuseau WordPress et les declencher chaque minute via WP-Cron.
 - Finaliser automatiquement les campagnes lorsque leur file ne contient plus de travail actif.
@@ -50,6 +54,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `{$wpdb->prefix}newsletter_campaign_suppressions`
 - `{$wpdb->prefix}newsletter_campaign_audit`
 - `{$wpdb->prefix}newsletter_campaign_campaigns`
+- `{$wpdb->prefix}newsletter_campaign_templates`
 - `{$wpdb->prefix}newsletter_campaign_queue`
 
 ## Options
@@ -80,6 +85,9 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 - `admin_post_newsletter_campaign_kit_create_topic`
 - `admin_post_newsletter_campaign_kit_update_assignment`
 - `admin_post_newsletter_campaign_kit_create_campaign`
+- `admin_post_newsletter_campaign_kit_save_template`
+- `admin_post_newsletter_campaign_kit_template_action`
+- `admin_post_newsletter_campaign_kit_preview`
 - `admin_post_newsletter_campaign_kit_transition_campaign`
 - `admin_post_newsletter_campaign_kit_schedule_campaign`
 - `admin_post_newsletter_campaign_kit_process_queue`
@@ -106,6 +114,7 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 17. Executer `wp eval-file tests/runtime-unsubscribe.php` dans WordPress pour verifier endpoint POST, idempotence, suppression avant envoi et remise `wp_mail`.
 18. Inspecter un email reel chez le provider afin de confirmer HTTPS, les deux en-tetes et leur couverture par la signature DKIM.
 19. Executer `wp eval-file tests/runtime-preferences.php` pour verifier GET non mutatif, CSRF, preferences thematiques, fail-closed provider, suppression durable et outils Privacy.
+20. Executer `wp eval-file tests/runtime-templates.php` pour verifier migration, sanitization, cycle de vie, interface admin, heritage campagne et `AltBody` remis a PHPMailer.
 
 ## Hooks publics
 
@@ -120,7 +129,7 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 
 - Edition, duplication, archivage et preview du nombre de destinataires pour les segments.
 - Imports/exports avances de listes, tags et segments.
-- Templates reutilisables avances et previsualisation email.
+- Edition et duplication completes des campagnes apres creation.
 - Provider API externe avance avec secrets hors Git.
 - Provider abstraction SMTP/API.
 - Webhooks signes pour automatiser bounces et complaints vers le registre de suppression.

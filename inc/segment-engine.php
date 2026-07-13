@@ -98,7 +98,7 @@ function newsletter_campaign_kit_normalize_segment_rules( $input ) {
 	return $rules;
 }
 
-function newsletter_campaign_kit_get_segments() {
+function newsletter_campaign_kit_get_segments( $include_archived = false ) {
 	global $wpdb;
 
 	if ( ! newsletter_campaign_kit_dynamic_tables_exist() ) {
@@ -106,10 +106,14 @@ function newsletter_campaign_kit_get_segments() {
 	}
 
 	$table = newsletter_campaign_kit_get_segments_table();
-	return $wpdb->get_results( "SELECT * FROM {$table} WHERE status = 'active' ORDER BY updated_at DESC", ARRAY_A );
+	if ( $include_archived ) {
+		return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY updated_at DESC", ARRAY_A );
+	}
+
+	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY updated_at DESC", 'active' ), ARRAY_A );
 }
 
-function newsletter_campaign_kit_get_segment( $segment_id ) {
+function newsletter_campaign_kit_get_segment( $segment_id, $include_archived = false ) {
 	global $wpdb;
 
 	$segment_id = absint( $segment_id );
@@ -118,7 +122,11 @@ function newsletter_campaign_kit_get_segment( $segment_id ) {
 	}
 
 	$table = newsletter_campaign_kit_get_segments_table();
-	return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d AND status = 'active' LIMIT 1", $segment_id ), ARRAY_A );
+	if ( $include_archived ) {
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $segment_id ), ARRAY_A );
+	}
+
+	return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d AND status = %s LIMIT 1", $segment_id, 'active' ), ARRAY_A );
 }
 
 function newsletter_campaign_kit_get_topics() {
@@ -200,6 +208,157 @@ function newsletter_campaign_kit_get_segment_recipients( $segment_id ) {
 	return $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A );
 }
 
+function newsletter_campaign_kit_get_segment_audience_count( $segment_id ) {
+	return count( newsletter_campaign_kit_get_segment_recipients( $segment_id ) );
+}
+
+function newsletter_campaign_kit_prepare_segment_data( $input ) {
+	$name        = isset( $input['name'] ) ? substr( sanitize_text_field( $input['name'] ), 0, 120 ) : '';
+	$description = isset( $input['description'] ) ? sanitize_textarea_field( $input['description'] ) : '';
+	$match_type  = isset( $input['match_type'] ) && 'any' === sanitize_key( $input['match_type'] ) ? 'any' : 'all';
+	$rules       = newsletter_campaign_kit_normalize_segment_rules( isset( $input['rules'] ) ? $input['rules'] : array() );
+
+	if ( '' === $name ) {
+		return new WP_Error( 'newsletter_invalid_segment', __( 'The segment name is required.', 'newsletter-campaign-kit' ) );
+	}
+	if ( is_wp_error( $rules ) ) {
+		return $rules;
+	}
+	if ( ! newsletter_campaign_kit_segment_rule_records_exist( $rules ) ) {
+		return new WP_Error( 'newsletter_invalid_segment_records', __( 'A selected list or tag is unavailable.', 'newsletter-campaign-kit' ) );
+	}
+
+	return array(
+		'name'        => $name,
+		'description' => $description,
+		'match_type'  => $match_type,
+		'rules'       => wp_json_encode( $rules ),
+	);
+}
+
+function newsletter_campaign_kit_create_segment( $input ) {
+	global $wpdb;
+
+	$data = newsletter_campaign_kit_prepare_segment_data( $input );
+	if ( is_wp_error( $data ) || ! newsletter_campaign_kit_dynamic_tables_exist() ) {
+		return is_wp_error( $data ) ? $data : new WP_Error( 'newsletter_segment_storage_unavailable', __( 'Segment storage is unavailable.', 'newsletter-campaign-kit' ) );
+	}
+	$table = newsletter_campaign_kit_get_segments_table();
+	$now   = current_time( 'mysql', true );
+	$ok    = $wpdb->insert(
+		$table,
+		array_merge(
+			$data,
+			array(
+				'slug'       => newsletter_campaign_kit_generate_unique_slug( $table, $data['name'] ),
+				'status'     => 'active',
+				'created_at' => $now,
+				'updated_at' => $now,
+			)
+		)
+	);
+	$result = false === $ok ? new WP_Error( 'newsletter_segment_create_failed', __( 'The segment could not be created.', 'newsletter-campaign-kit' ) ) : (int) $wpdb->insert_id;
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( is_wp_error( $result ) ? 'newsletter_segment_create_failed' : 'newsletter_segment_created', is_wp_error( $result ) ? 'failure' : 'success', 0, array( 'name' => $data['name'] ) );
+	}
+
+	return $result;
+}
+
+function newsletter_campaign_kit_update_segment( $segment_id, $input ) {
+	global $wpdb;
+
+	$segment = newsletter_campaign_kit_get_segment( $segment_id, true );
+	if ( ! $segment ) {
+		return new WP_Error( 'newsletter_segment_not_found', __( 'Segment not found.', 'newsletter-campaign-kit' ) );
+	}
+	if ( 'active' !== $segment['status'] ) {
+		return new WP_Error( 'newsletter_segment_archived', __( 'Restore the segment before editing it.', 'newsletter-campaign-kit' ) );
+	}
+	$data = newsletter_campaign_kit_prepare_segment_data( $input );
+	if ( is_wp_error( $data ) ) {
+		return $data;
+	}
+	$data['updated_at'] = current_time( 'mysql', true );
+	$updated            = $wpdb->update( newsletter_campaign_kit_get_segments_table(), $data, array( 'id' => absint( $segment_id ), 'status' => 'active' ) );
+	$result             = false === $updated ? new WP_Error( 'newsletter_segment_update_failed', __( 'The segment could not be updated.', 'newsletter-campaign-kit' ) ) : true;
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( is_wp_error( $result ) ? 'newsletter_segment_update_failed' : 'newsletter_segment_updated', is_wp_error( $result ) ? 'failure' : 'success', 0, array( 'segment_id' => absint( $segment_id ) ) );
+	}
+
+	return $result;
+}
+
+function newsletter_campaign_kit_duplicate_segment( $segment_id ) {
+	$segment = newsletter_campaign_kit_get_segment( $segment_id, true );
+	if ( ! $segment ) {
+		return new WP_Error( 'newsletter_segment_not_found', __( 'Segment not found.', 'newsletter-campaign-kit' ) );
+	}
+	$rules = json_decode( $segment['rules'], true );
+
+	return newsletter_campaign_kit_create_segment(
+		array(
+			'name'        => sprintf( __( '%s copy', 'newsletter-campaign-kit' ), $segment['name'] ),
+			'description' => $segment['description'],
+			'match_type'  => $segment['match_type'],
+			'rules'       => is_array( $rules ) ? $rules : array(),
+		)
+	);
+}
+
+function newsletter_campaign_kit_segment_has_active_campaigns( $segment_id ) {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_campaigns_table_exists() ) {
+		return false;
+	}
+	$table        = newsletter_campaign_kit_get_campaigns_table();
+	$placeholders = implode( ',', array_fill( 0, 5, '%s' ) );
+	$params       = array_merge( array( absint( $segment_id ) ), array( 'draft', 'ready', 'scheduled', 'sending', 'paused' ) );
+
+	return (bool) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE target_segment_id = %d AND status IN ({$placeholders}) LIMIT 1", $params ) );
+}
+
+function newsletter_campaign_kit_set_segment_status( $segment_id, $status ) {
+	global $wpdb;
+
+	$segment = newsletter_campaign_kit_get_segment( $segment_id, true );
+	if ( ! $segment || ! in_array( $status, array( 'active', 'archived' ), true ) ) {
+		return new WP_Error( 'newsletter_invalid_segment_status', __( 'The segment status is invalid.', 'newsletter-campaign-kit' ) );
+	}
+	if ( 'archived' === $status && newsletter_campaign_kit_segment_has_active_campaigns( $segment_id ) ) {
+		return new WP_Error( 'newsletter_segment_in_use', __( 'This segment is used by a non-terminal campaign.', 'newsletter-campaign-kit' ) );
+	}
+	$updated = $wpdb->update(
+		newsletter_campaign_kit_get_segments_table(),
+		array( 'status' => $status, 'updated_at' => current_time( 'mysql', true ) ),
+		array( 'id' => absint( $segment_id ) ),
+		array( '%s', '%s' ),
+		array( '%d' )
+	);
+	$result = false === $updated ? new WP_Error( 'newsletter_segment_status_failed', __( 'The segment status could not be changed.', 'newsletter-campaign-kit' ) ) : true;
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( is_wp_error( $result ) ? 'newsletter_segment_status_failed' : 'newsletter_segment_status_changed', is_wp_error( $result ) ? 'failure' : 'success', 0, array( 'segment_id' => absint( $segment_id ), 'status' => $status ) );
+	}
+
+	return $result;
+}
+
+function newsletter_campaign_kit_get_segment_input_from_request() {
+	return array(
+		'name'        => isset( $_POST['segment_name'] ) ? wp_unslash( $_POST['segment_name'] ) : '',
+		'description' => isset( $_POST['segment_description'] ) ? wp_unslash( $_POST['segment_description'] ) : '',
+		'match_type'  => isset( $_POST['segment_match_type'] ) ? wp_unslash( $_POST['segment_match_type'] ) : 'all',
+		'rules'       => array(
+			'list_ids'       => isset( $_POST['segment_list_ids'] ) ? wp_unslash( $_POST['segment_list_ids'] ) : array(),
+			'tag_ids'        => isset( $_POST['segment_tag_ids'] ) ? wp_unslash( $_POST['segment_tag_ids'] ) : array(),
+			'sources'        => isset( $_POST['segment_sources'] ) ? wp_unslash( $_POST['segment_sources'] ) : '',
+			'created_after'  => isset( $_POST['segment_created_after'] ) ? wp_unslash( $_POST['segment_created_after'] ) : '',
+			'created_before' => isset( $_POST['segment_created_before'] ) ? wp_unslash( $_POST['segment_created_before'] ) : '',
+		),
+	);
+}
+
 function newsletter_campaign_kit_handle_create_segment() {
 	if ( ! current_user_can( 'newsletter_manage_lists' ) ) {
 		wp_die( esc_html__( 'You are not allowed to create newsletter segments.', 'newsletter-campaign-kit' ) );
@@ -207,50 +366,48 @@ function newsletter_campaign_kit_handle_create_segment() {
 
 	check_admin_referer( 'newsletter_campaign_kit_create_segment' );
 
-	$name        = isset( $_POST['segment_name'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_name'] ) ) : '';
-	$description = isset( $_POST['segment_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['segment_description'] ) ) : '';
-	$match_type  = isset( $_POST['segment_match_type'] ) && 'any' === sanitize_key( wp_unslash( $_POST['segment_match_type'] ) ) ? 'any' : 'all';
-	$rules       = newsletter_campaign_kit_normalize_segment_rules(
-		array(
-			'list_ids'       => isset( $_POST['segment_list_ids'] ) ? wp_unslash( $_POST['segment_list_ids'] ) : array(),
-			'tag_ids'        => isset( $_POST['segment_tag_ids'] ) ? wp_unslash( $_POST['segment_tag_ids'] ) : array(),
-			'sources'        => isset( $_POST['segment_sources'] ) ? wp_unslash( $_POST['segment_sources'] ) : '',
-			'created_after'  => isset( $_POST['segment_created_after'] ) ? wp_unslash( $_POST['segment_created_after'] ) : '',
-			'created_before' => isset( $_POST['segment_created_before'] ) ? wp_unslash( $_POST['segment_created_before'] ) : '',
-		)
-	);
-
-	if ( '' === $name || is_wp_error( $rules ) || ! newsletter_campaign_kit_dynamic_tables_exist() || ! newsletter_campaign_kit_segment_rule_records_exist( $rules ) ) {
-		wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&segment=invalid' ) );
-		exit;
-	}
-
-	global $wpdb;
-	$table = newsletter_campaign_kit_get_segments_table();
-	$now   = current_time( 'mysql', true );
-	$ok    = $wpdb->insert(
-		$table,
-		array(
-			'name'        => $name,
-			'slug'        => newsletter_campaign_kit_generate_unique_slug( $table, $name ),
-			'description' => $description,
-			'match_type'  => $match_type,
-			'rules'       => wp_json_encode( $rules ),
-			'status'      => 'active',
-			'created_at'  => $now,
-			'updated_at'  => $now,
-		),
-		array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
-	);
-
-	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
-		newsletter_campaign_kit_log_event( false === $ok ? 'newsletter_segment_create_failed' : 'newsletter_segment_created', false === $ok ? 'failure' : 'success', 0, array( 'name' => $name ) );
-	}
-
-	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&segment=' . ( false === $ok ? 'failed' : 'created' ) ) );
+	$result = newsletter_campaign_kit_create_segment( newsletter_campaign_kit_get_segment_input_from_request() );
+	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&segment=' . ( is_wp_error( $result ) ? 'invalid' : 'created' ) ) );
 	exit;
 }
 add_action( 'admin_post_newsletter_campaign_kit_create_segment', 'newsletter_campaign_kit_handle_create_segment' );
+
+function newsletter_campaign_kit_handle_update_segment() {
+	if ( ! current_user_can( 'newsletter_manage_lists' ) ) {
+		wp_die( esc_html__( 'You are not allowed to edit newsletter segments.', 'newsletter-campaign-kit' ) );
+	}
+	$segment_id = isset( $_POST['segment_id'] ) ? absint( $_POST['segment_id'] ) : 0;
+	check_admin_referer( 'newsletter_campaign_kit_update_segment_' . $segment_id );
+	$result = newsletter_campaign_kit_update_segment( $segment_id, newsletter_campaign_kit_get_segment_input_from_request() );
+	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&segment=' . ( is_wp_error( $result ) ? 'invalid' : 'updated' ) ) );
+	exit;
+}
+add_action( 'admin_post_newsletter_campaign_kit_update_segment', 'newsletter_campaign_kit_handle_update_segment' );
+
+function newsletter_campaign_kit_handle_duplicate_segment() {
+	if ( ! current_user_can( 'newsletter_manage_lists' ) ) {
+		wp_die( esc_html__( 'You are not allowed to duplicate newsletter segments.', 'newsletter-campaign-kit' ) );
+	}
+	$segment_id = isset( $_POST['segment_id'] ) ? absint( $_POST['segment_id'] ) : 0;
+	check_admin_referer( 'newsletter_campaign_kit_duplicate_segment_' . $segment_id );
+	$result = newsletter_campaign_kit_duplicate_segment( $segment_id );
+	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&segment=' . ( is_wp_error( $result ) ? 'invalid' : 'duplicated' ) ) );
+	exit;
+}
+add_action( 'admin_post_newsletter_campaign_kit_duplicate_segment', 'newsletter_campaign_kit_handle_duplicate_segment' );
+
+function newsletter_campaign_kit_handle_segment_status() {
+	if ( ! current_user_can( 'newsletter_manage_lists' ) ) {
+		wp_die( esc_html__( 'You are not allowed to archive newsletter segments.', 'newsletter-campaign-kit' ) );
+	}
+	$segment_id = isset( $_POST['segment_id'] ) ? absint( $_POST['segment_id'] ) : 0;
+	$status     = isset( $_POST['segment_status'] ) ? sanitize_key( wp_unslash( $_POST['segment_status'] ) ) : '';
+	check_admin_referer( 'newsletter_campaign_kit_segment_status_' . $segment_id );
+	$result = newsletter_campaign_kit_set_segment_status( $segment_id, $status );
+	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&segment=' . ( is_wp_error( $result ) ? $result->get_error_code() : $status ) ) );
+	exit;
+}
+add_action( 'admin_post_newsletter_campaign_kit_segment_status', 'newsletter_campaign_kit_handle_segment_status' );
 
 function newsletter_campaign_kit_handle_create_topic() {
 	if ( ! current_user_can( 'newsletter_manage_lists' ) ) {

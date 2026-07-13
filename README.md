@@ -18,6 +18,8 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Exclure les opt-out thematiques et suppressions a la resolution d'audience puis juste avant le provider.
 - Conserver une suppression durable par HMAC apres suppression ou re-import du contact, avec levee admin explicite sans reabonnement automatique.
 - Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
+- Modifier uniquement les brouillons et dupliquer toute campagne vers un nouveau brouillon sans etat de livraison ni file d'envoi.
+- Modifier, dupliquer, archiver et restaurer les segments avec estimation exacte de leur audience et verrou d'archivage lorsqu'une campagne non terminale les utilise.
 - Creer, modifier, dupliquer, archiver et restaurer des templates editoriaux reutilisables.
 - Heriter d'un template dans une campagne tout en autorisant des surcharges explicites.
 - Previsualiser les versions HTML et texte dans une page admin isolee par capability, nonce et CSP.
@@ -82,9 +84,14 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 - `admin_post_newsletter_campaign_kit_create_list`
 - `admin_post_newsletter_campaign_kit_create_tag`
 - `admin_post_newsletter_campaign_kit_create_segment`
+- `admin_post_newsletter_campaign_kit_update_segment`
+- `admin_post_newsletter_campaign_kit_duplicate_segment`
+- `admin_post_newsletter_campaign_kit_segment_status`
 - `admin_post_newsletter_campaign_kit_create_topic`
 - `admin_post_newsletter_campaign_kit_update_assignment`
 - `admin_post_newsletter_campaign_kit_create_campaign`
+- `admin_post_newsletter_campaign_kit_update_campaign`
+- `admin_post_newsletter_campaign_kit_duplicate_campaign`
 - `admin_post_newsletter_campaign_kit_save_template`
 - `admin_post_newsletter_campaign_kit_template_action`
 - `admin_post_newsletter_campaign_kit_preview`
@@ -115,6 +122,7 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 18. Inspecter un email reel chez le provider afin de confirmer HTTPS, les deux en-tetes et leur couverture par la signature DKIM.
 19. Executer `wp eval-file tests/runtime-preferences.php` pour verifier GET non mutatif, CSRF, preferences thematiques, fail-closed provider, suppression durable et outils Privacy.
 20. Executer `wp eval-file tests/runtime-templates.php` pour verifier migration, sanitization, cycle de vie, interface admin, heritage campagne et `AltBody` remis a PHPMailer.
+21. Executer `wp eval-file tests/runtime-lifecycle.php` pour verifier edition/verrouillage/duplication des campagnes, lifecycle des segments, volumes d'audience et garde d'archivage.
 
 ## Hooks publics
 
@@ -127,9 +135,9 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 
 ## Reste majeur
 
-- Edition, duplication, archivage et preview du nombre de destinataires pour les segments.
 - Imports/exports avances de listes, tags et segments.
-- Edition et duplication completes des campagnes apres creation.
+- Snapshots d'audience immuables permettant d'expliquer le ciblage apres envoi.
+- Bibliotheque de blocs editoriaux au-dela des templates complets.
 - Provider API externe avance avec secrets hors Git.
 - Provider abstraction SMTP/API.
 - Webhooks signes pour automatiser bounces et complaints vers le registre de suppression.

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.1.8
+ * Version: 0.2.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.1.8' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.2.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -237,8 +237,17 @@ function newsletter_campaign_kit_activate() {
 	}
 
 	update_option( 'newsletter_campaign_kit_version', NEWSLETTER_CAMPAIGN_KIT_VERSION, false );
+
+	if ( function_exists( 'newsletter_campaign_kit_schedule_runner' ) ) {
+		newsletter_campaign_kit_schedule_runner();
+	}
 }
 register_activation_hook( __FILE__, 'newsletter_campaign_kit_activate' );
+
+function newsletter_campaign_kit_deactivate() {
+	wp_clear_scheduled_hook( 'newsletter_campaign_kit_run_scheduled' );
+}
+register_deactivation_hook( __FILE__, 'newsletter_campaign_kit_deactivate' );
 
 /**
  * Apply versioned upgrades for already active installations.
@@ -259,5 +268,6 @@ require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/campaigns.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/providers.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/queue.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/scheduler.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/reports.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/admin.php';

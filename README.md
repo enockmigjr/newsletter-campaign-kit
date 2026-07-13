@@ -10,7 +10,9 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Fournir une premiere UI admin pour consulter, filtrer, changer le statut et exporter les abonnes.
 - Creer des listes et tags de segmentation avec liaisons abonnes/listes/tags.
 - Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
-- Preparer une queue batch avec retry/backoff pour les futures livraisons email.
+- Executer une queue batch avec verrou atomique, reprise des verrous expires et retry/backoff.
+- Programmer les campagnes dans le fuseau WordPress et les declencher chaque minute via WP-Cron.
+- Finaliser automatiquement les campagnes lorsque leur file ne contient plus de travail actif.
 - Configurer un provider `wp_mail` ou un adaptateur externe via filtre WordPress.
 - Afficher un reporting de livraison par campagne depuis la queue.
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
@@ -54,6 +56,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `admin_post_newsletter_campaign_kit_create_tag`
 - `admin_post_newsletter_campaign_kit_create_campaign`
 - `admin_post_newsletter_campaign_kit_transition_campaign`
+- `admin_post_newsletter_campaign_kit_schedule_campaign`
 - `admin_post_newsletter_campaign_kit_process_queue`
 - `admin_post_newsletter_campaign_kit_save_provider_settings`
 
@@ -70,6 +73,8 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 9. Verifier que la queue exige newsletter_send_campaigns et retente avec backoff lorsqu'aucun provider n'est branche.
 10. Verifier que le provider wp_mail exige newsletter_manage_settings pour ses reglages et n'enregistre aucun secret.
 11. Verifier que les reports exigent newsletter_view_reports et n'inventent pas ouvertures/clics sans tracking.
+12. Verifier que le hook `newsletter_campaign_kit_run_scheduled` est unique, traite une campagne echue et ne cree pas deux lignes pour un meme couple campagne/abonne.
+13. Executer `php tests/schedule-date.php` pour valider les dates impossibles, passees et futures.
 
 ## Reste majeur
 
@@ -78,3 +83,9 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - Provider API externe avance avec secrets hors Git.
 - Provider abstraction SMTP/API.
 - Tracking ouvertures/clics et exports de reporting avances.
+
+## References officielles
+
+- [WordPress Plugin Handbook - Cron](https://developer.wordpress.org/plugins/cron/)
+- [WordPress Code Reference - wp_schedule_event](https://developer.wordpress.org/reference/functions/wp_schedule_event/)
+- [WordPress Code Reference - wp_clear_scheduled_hook](https://developer.wordpress.org/reference/functions/wp_clear_scheduled_hook/)

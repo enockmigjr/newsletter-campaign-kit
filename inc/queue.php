@@ -159,12 +159,13 @@ function newsletter_campaign_kit_process_queue_batch( $limit = 20 ) {
 		return array( 'processed' => 0, 'sent' => 0, 'failed' => 0, 'retried' => 0 );
 	}
 
-	$queue_table = newsletter_campaign_kit_get_queue_table();
-	$limit       = max( 1, min( 100, absint( $limit ) ) );
-	$now         = current_time( 'mysql', true );
-	$items       = $wpdb->get_results(
+	$queue_table     = newsletter_campaign_kit_get_queue_table();
+	$campaigns_table = newsletter_campaign_kit_get_campaigns_table();
+	$limit           = max( 1, min( 100, absint( $limit ) ) );
+	$now             = current_time( 'mysql', true );
+	$items           = $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT * FROM {$queue_table} WHERE status = %s AND attempts < %d AND next_attempt_at <= %s ORDER BY next_attempt_at ASC, id ASC LIMIT %d",
+			"SELECT q.* FROM {$queue_table} q INNER JOIN {$campaigns_table} c ON c.id = q.campaign_id WHERE q.status = %s AND c.status = 'sending' AND q.attempts < %d AND q.next_attempt_at <= %s ORDER BY q.next_attempt_at ASC, q.id ASC LIMIT %d",
 			'pending',
 			5,
 			$now,
@@ -172,7 +173,7 @@ function newsletter_campaign_kit_process_queue_batch( $limit = 20 ) {
 		),
 		ARRAY_A
 	);
-	$result      = array( 'processed' => 0, 'sent' => 0, 'failed' => 0, 'retried' => 0 );
+	$result          = array( 'processed' => 0, 'sent' => 0, 'failed' => 0, 'retried' => 0 );
 
 	foreach ( $items as $item ) {
 		$item_id = absint( $item['id'] );
@@ -193,7 +194,18 @@ function newsletter_campaign_kit_process_queue_batch( $limit = 20 ) {
 		$send       = new WP_Error( 'newsletter_no_provider', __( 'No newsletter provider is configured yet.', 'newsletter-campaign-kit' ) );
 
 		if ( $campaign && $subscriber ) {
-			$send = apply_filters( 'newsletter_campaign_kit_send_email', $send, $campaign, $subscriber, $item );
+			if ( 'subscribed' === $subscriber['status'] ) {
+				$send = apply_filters( 'newsletter_campaign_kit_send_email', $send, $campaign, $subscriber, $item );
+			} else {
+				$wpdb->update(
+					$queue_table,
+					array( 'status' => 'cancelled', 'locked_at' => null, 'last_error' => '', 'updated_at' => $now ),
+					array( 'id' => $item_id ),
+					array( '%s', '%s', '%s', '%s' ),
+					array( '%d' )
+				);
+				continue;
+			}
 		}
 
 		if ( true === $send ) {
@@ -241,6 +253,28 @@ function newsletter_campaign_kit_process_queue_batch( $limit = 20 ) {
 	}
 
 	return $result;
+}
+
+function newsletter_campaign_kit_recover_stale_queue_locks( $timeout = 900 ) {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_queue_table_exists() ) {
+		return 0;
+	}
+
+	$timeout = max( 300, min( 3600, absint( $timeout ) ) );
+	$table   = newsletter_campaign_kit_get_queue_table();
+	$now     = current_time( 'mysql', true );
+	$stale   = gmdate( 'Y-m-d H:i:s', time() - $timeout );
+
+	return (int) $wpdb->query(
+		$wpdb->prepare(
+			"UPDATE {$table} SET status = 'pending', locked_at = NULL, next_attempt_at = %s, updated_at = %s WHERE status = 'processing' AND locked_at IS NOT NULL AND locked_at <= %s",
+			$now,
+			$now,
+			$stale
+		)
+	);
 }
 
 function newsletter_campaign_kit_get_queue_subscriber( $subscriber_id ) {

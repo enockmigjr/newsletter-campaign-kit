@@ -148,6 +148,11 @@ function newsletter_campaign_kit_handle_transition_campaign() {
 	);
 	$types = array( '%s', '%d', '%s' );
 
+	if ( 'ready' === $next_status ) {
+		$data['scheduled_at'] = null;
+		$types[]              = '%s';
+	}
+
 	if ( 'sent' === $next_status ) {
 		$data['sent_at'] = $now;
 		$types[]         = '%s';
@@ -177,6 +182,71 @@ function newsletter_campaign_kit_handle_transition_campaign() {
 }
 add_action( 'admin_post_newsletter_campaign_kit_transition_campaign', 'newsletter_campaign_kit_handle_transition_campaign' );
 
+function newsletter_campaign_kit_parse_schedule_datetime( $value ) {
+	$value = sanitize_text_field( $value );
+	if ( ! preg_match( '/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/', $value ) ) {
+		return new WP_Error( 'newsletter_invalid_schedule', __( 'The scheduled date is invalid.', 'newsletter-campaign-kit' ) );
+	}
+
+	$date   = DateTimeImmutable::createFromFormat( '!Y-m-d\\TH:i', $value, wp_timezone() );
+	$errors = DateTimeImmutable::getLastErrors();
+	if ( false === $date || ( is_array( $errors ) && ( $errors['warning_count'] || $errors['error_count'] ) ) ) {
+		return new WP_Error( 'newsletter_invalid_schedule', __( 'The scheduled date is invalid.', 'newsletter-campaign-kit' ) );
+	}
+
+	$minimum = new DateTimeImmutable( '+1 minute', wp_timezone() );
+	if ( $date < $minimum ) {
+		return new WP_Error( 'newsletter_schedule_in_past', __( 'The scheduled date must be in the future.', 'newsletter-campaign-kit' ) );
+	}
+
+	return $date->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' );
+}
+
+function newsletter_campaign_kit_handle_schedule_campaign() {
+	if ( ! current_user_can( 'newsletter_send_campaigns' ) ) {
+		wp_die( esc_html__( 'You are not allowed to schedule newsletter campaigns.', 'newsletter-campaign-kit' ) );
+	}
+
+	$campaign_id = isset( $_POST['campaign_id'] ) ? absint( $_POST['campaign_id'] ) : 0;
+	check_admin_referer( 'newsletter_campaign_kit_schedule_campaign_' . $campaign_id );
+
+	$campaign = newsletter_campaign_kit_get_campaign( $campaign_id );
+	$value    = isset( $_POST['scheduled_at'] ) ? wp_unslash( $_POST['scheduled_at'] ) : '';
+	$date     = newsletter_campaign_kit_parse_schedule_datetime( $value );
+	if ( ! $campaign || ! in_array( $campaign['status'], array( 'ready', 'scheduled' ), true ) || is_wp_error( $date ) ) {
+		wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns&scheduled=invalid' ) );
+		exit;
+	}
+
+	global $wpdb;
+	$table   = newsletter_campaign_kit_get_campaigns_table();
+	$updated = $wpdb->update(
+		$table,
+		array(
+			'status'       => 'scheduled',
+			'scheduled_at' => $date,
+			'updated_by'   => get_current_user_id(),
+			'updated_at'   => current_time( 'mysql', true ),
+		),
+		array( 'id' => $campaign_id, 'status' => $campaign['status'] ),
+		array( '%s', '%s', '%d', '%s' ),
+		array( '%d', '%s' )
+	);
+
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event(
+			false === $updated ? 'newsletter_campaign_schedule_failed' : 'newsletter_campaign_scheduled',
+			false === $updated ? 'failure' : 'success',
+			0,
+			array( 'campaign_id' => $campaign_id, 'scheduled_at' => $date )
+		);
+	}
+
+	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns&scheduled=' . ( false === $updated ? 'failed' : 'success' ) ) );
+	exit;
+}
+add_action( 'admin_post_newsletter_campaign_kit_schedule_campaign', 'newsletter_campaign_kit_handle_schedule_campaign' );
+
 function newsletter_campaign_kit_register_campaigns_menu() {
 	add_submenu_page(
 		'newsletter-campaign-kit',
@@ -194,6 +264,9 @@ function newsletter_campaign_kit_render_campaign_transition_actions( $campaign )
 	$next_steps  = isset( $transitions[ $campaign['status'] ] ) ? $transitions[ $campaign['status'] ] : array();
 
 	foreach ( $next_steps as $next_status ) {
+		if ( 'scheduled' === $next_status ) {
+			continue;
+		}
 		if ( ! newsletter_campaign_kit_user_can_transition_campaign( $campaign['status'], $next_status ) ) {
 			continue;
 		}
@@ -204,6 +277,22 @@ function newsletter_campaign_kit_render_campaign_transition_actions( $campaign )
 			<input type="hidden" name="next_status" value="<?php echo esc_attr( $next_status ); ?>">
 			<?php wp_nonce_field( 'newsletter_campaign_kit_transition_campaign_' . absint( $campaign['id'] ) ); ?>
 			<button class="button button-small" type="submit"><?php echo esc_html( ucfirst( $next_status ) ); ?></button>
+		</form>
+		<?php
+	}
+
+	if ( in_array( $campaign['status'], array( 'ready', 'scheduled' ), true ) && current_user_can( 'newsletter_send_campaigns' ) ) {
+		$scheduled_value = '';
+		if ( ! empty( $campaign['scheduled_at'] ) ) {
+			$scheduled_value = get_date_from_gmt( $campaign['scheduled_at'], 'Y-m-d\\TH:i' );
+		}
+		?>
+		<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="newsletter_campaign_kit_schedule_campaign">
+			<input type="hidden" name="campaign_id" value="<?php echo esc_attr( $campaign['id'] ); ?>">
+			<?php wp_nonce_field( 'newsletter_campaign_kit_schedule_campaign_' . absint( $campaign['id'] ) ); ?>
+			<input type="datetime-local" name="scheduled_at" value="<?php echo esc_attr( $scheduled_value ); ?>" required>
+			<button class="button button-small" type="submit"><?php esc_html_e( 'Schedule', 'newsletter-campaign-kit' ); ?></button>
 		</form>
 		<?php
 	}
@@ -249,14 +338,15 @@ function newsletter_campaign_kit_render_campaigns_page() {
 
 		<h2><?php esc_html_e( 'Campaign pipeline', 'newsletter-campaign-kit' ); ?></h2>
 		<table class="widefat fixed striped">
-			<thead><tr><th><?php esc_html_e( 'Title', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subject', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Updated', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Transitions', 'newsletter-campaign-kit' ); ?></th></tr></thead>
+			<thead><tr><th><?php esc_html_e( 'Title', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subject', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Scheduled', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Updated', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Transitions', 'newsletter-campaign-kit' ); ?></th></tr></thead>
 			<tbody>
-			<?php if ( empty( $campaigns ) ) : ?><tr><td colspan="5"><?php esc_html_e( 'No campaign draft yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
+			<?php if ( empty( $campaigns ) ) : ?><tr><td colspan="6"><?php esc_html_e( 'No campaign draft yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
 			<?php foreach ( $campaigns as $campaign ) : ?>
 				<tr>
 					<td><strong><?php echo esc_html( $campaign['title'] ); ?></strong><br><code><?php echo esc_html( $campaign['slug'] ); ?></code></td>
 					<td><?php echo esc_html( $campaign['subject'] ); ?></td>
 					<td><code><?php echo esc_html( isset( $statuses[ $campaign['status'] ] ) ? $statuses[ $campaign['status'] ] : $campaign['status'] ); ?></code></td>
+					<td><?php echo ! empty( $campaign['scheduled_at'] ) ? esc_html( get_date_from_gmt( $campaign['scheduled_at'], 'Y-m-d H:i' ) ) : esc_html__( 'Not scheduled', 'newsletter-campaign-kit' ); ?></td>
 					<td><?php echo esc_html( get_date_from_gmt( $campaign['updated_at'], 'Y-m-d H:i' ) ); ?></td>
 					<td><div class="nck-inline-actions"><?php newsletter_campaign_kit_render_campaign_transition_actions( $campaign ); ?></div></td>
 				</tr>

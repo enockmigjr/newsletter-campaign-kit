@@ -702,6 +702,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	$segments  = function_exists( 'newsletter_campaign_kit_get_segments' ) ? newsletter_campaign_kit_get_segments() : array();
 	$topics    = function_exists( 'newsletter_campaign_kit_get_topics' ) ? newsletter_campaign_kit_get_topics() : array();
 	$templates = function_exists( 'newsletter_campaign_kit_get_templates' ) ? newsletter_campaign_kit_get_templates() : array();
+	$default_template_id = function_exists( 'newsletter_campaign_kit_get_default_template_id' ) ? newsletter_campaign_kit_get_default_template_id() : 0;
 	$blocks    = function_exists( 'newsletter_campaign_kit_get_blocks' ) ? newsletter_campaign_kit_get_blocks() : array();
 	$statuses  = newsletter_campaign_kit_get_campaign_statuses();
 	$edit_id   = isset( $_GET['edit'] ) ? absint( $_GET['edit'] ) : 0;
@@ -752,7 +753,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 				<?php if ( $editing ) : ?><input type="hidden" name="campaign_id" value="<?php echo esc_attr( $editing['id'] ); ?>"><?php endif; ?>
 				<?php wp_nonce_field( $editing ? 'newsletter_campaign_kit_update_campaign_' . absint( $editing['id'] ) : 'newsletter_campaign_kit_create_campaign' ); ?>
 				<p><input class="regular-text" name="campaign_title" required maxlength="190" value="<?php echo esc_attr( $editing ? $editing['title'] : '' ); ?>" placeholder="<?php esc_attr_e( 'July visual letter', 'newsletter-campaign-kit' ); ?>"></p>
-				<p><label for="nck-template-id"><?php esc_html_e( 'Start from a template', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-template-id" name="template_id"><option value="0"><?php esc_html_e( 'No template', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $templates as $template ) : ?><option value="<?php echo esc_attr( $template['id'] ); ?>" <?php selected( $editing ? (int) $editing['template_id'] : 0, (int) $template['id'] ); ?>><?php echo esc_html( $template['name'] ); ?></option><?php endforeach; ?></select></p>
+				<p><label for="nck-template-id"><?php esc_html_e( 'Start from a template', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-template-id" name="template_id"><option value="0"><?php esc_html_e( 'No template', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $templates as $template ) : ?><option value="<?php echo esc_attr( $template['id'] ); ?>" <?php selected( $editing ? (int) $editing['template_id'] : $default_template_id, (int) $template['id'] ); ?>><?php echo esc_html( $template['name'] ); ?></option><?php endforeach; ?></select></p>
 				<p><input class="regular-text" name="campaign_subject" maxlength="190" value="<?php echo esc_attr( $editing ? $editing['subject'] : '' ); ?>" placeholder="<?php esc_attr_e( 'Subject override (optional with a template)', 'newsletter-campaign-kit' ); ?>"></p>
 				<p><input class="large-text" name="campaign_preview_text" maxlength="255" value="<?php echo esc_attr( $editing ? $editing['preview_text'] : '' ); ?>" placeholder="<?php esc_attr_e( 'Short inbox preview text.', 'newsletter-campaign-kit' ); ?>"></p>
 				<p>

@@ -66,6 +66,102 @@ function newsletter_campaign_kit_get_templates( $include_archived = false ) {
 	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY updated_at DESC LIMIT 100", 'active' ), ARRAY_A );
 }
 
+/** Return the immutable definitions used to initialize a useful template library. */
+function newsletter_campaign_kit_get_default_template_definitions() {
+	return array(
+		'editorial-letter' => array(
+			'name'         => __( 'Editorial letter', 'newsletter-campaign-kit' ),
+			'subject'      => __( 'A new story from the archive', 'newsletter-campaign-kit' ),
+			'preview_text' => __( 'A selection of images, notes and recent work.', 'newsletter-campaign-kit' ),
+			'html_body'    => '<h1>' . esc_html__( 'A new story begins here', 'newsletter-campaign-kit' ) . '</h1><p>' . esc_html__( 'Share the opening note of this edition, then introduce the photographs, places or people at its centre.', 'newsletter-campaign-kit' ) . '</p><p><strong>' . esc_html__( 'Selected work', 'newsletter-campaign-kit' ) . '</strong></p><p>' . esc_html__( 'Add the story, link or invitation that should remain with the reader.', 'newsletter-campaign-kit' ) . '</p>',
+		),
+		'new-collection' => array(
+			'name'         => __( 'New collection', 'newsletter-campaign-kit' ),
+			'subject'      => __( 'Discover the latest collection', 'newsletter-campaign-kit' ),
+			'preview_text' => __( 'A new visual series is now available.', 'newsletter-campaign-kit' ),
+			'html_body'    => '<h1>' . esc_html__( 'A collection enters the archive', 'newsletter-campaign-kit' ) . '</h1><p>' . esc_html__( 'Introduce the intention, territory and period behind the series.', 'newsletter-campaign-kit' ) . '</p><p><strong>' . esc_html__( 'Collection details', 'newsletter-campaign-kit' ) . '</strong></p><p>' . esc_html__( 'Add the number of works, location, year and access conditions.', 'newsletter-campaign-kit' ) . '</p>',
+		),
+		'journal-dispatch' => array(
+			'name'         => __( 'Journal dispatch', 'newsletter-campaign-kit' ),
+			'subject'      => __( 'Notes from the visual journal', 'newsletter-campaign-kit' ),
+			'preview_text' => __( 'A recent field note from the studio.', 'newsletter-campaign-kit' ),
+			'html_body'    => '<h1>' . esc_html__( 'From the visual journal', 'newsletter-campaign-kit' ) . '</h1><p>' . esc_html__( 'Open with the observation, encounter or working note that shaped this entry.', 'newsletter-campaign-kit' ) . '</p><blockquote>' . esc_html__( 'Add one short passage that carries the voice of the journal.', 'newsletter-campaign-kit' ) . '</blockquote><p>' . esc_html__( 'Continue the story and direct readers to the complete article.', 'newsletter-campaign-kit' ) . '</p>',
+		),
+		'private-invitation' => array(
+			'name'         => __( 'Private invitation', 'newsletter-campaign-kit' ),
+			'subject'      => __( 'Your invitation to a private viewing', 'newsletter-campaign-kit' ),
+			'preview_text' => __( 'A protected collection is ready for you.', 'newsletter-campaign-kit' ),
+			'html_body'    => '<h1>' . esc_html__( 'A private viewing', 'newsletter-campaign-kit' ) . '</h1><p>' . esc_html__( 'Explain why this recipient is invited and what the protected selection contains.', 'newsletter-campaign-kit' ) . '</p><p><strong>' . esc_html__( 'Access details', 'newsletter-campaign-kit' ) . '</strong></p><p>' . esc_html__( 'Add the validity period and the secure destination supplied by your access workflow.', 'newsletter-campaign-kit' ) . '</p>',
+		),
+		'event-announcement' => array(
+			'name'         => __( 'Exhibition or event', 'newsletter-campaign-kit' ),
+			'subject'      => __( 'An upcoming exhibition and gathering', 'newsletter-campaign-kit' ),
+			'preview_text' => __( 'Dates, place and practical information.', 'newsletter-campaign-kit' ),
+			'html_body'    => '<h1>' . esc_html__( 'Meet the work in person', 'newsletter-campaign-kit' ) . '</h1><p>' . esc_html__( 'Present the exhibition, publication or collaboration in a few direct lines.', 'newsletter-campaign-kit' ) . '</p><p><strong>' . esc_html__( 'Date and location', 'newsletter-campaign-kit' ) . '</strong></p><p>' . esc_html__( 'Add the programme, address and reservation information.', 'newsletter-campaign-kit' ) . '</p>',
+		),
+	);
+}
+
+/** Seed missing defaults once without replacing administrator customizations. */
+function newsletter_campaign_kit_seed_default_templates() {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_templates_table_exists() ) {
+		return 0;
+	}
+
+	$table   = newsletter_campaign_kit_get_templates_table();
+	$created = 0;
+	$now     = current_time( 'mysql', true );
+	foreach ( newsletter_campaign_kit_get_default_template_definitions() as $slug => $definition ) {
+		$slug = sanitize_title( $slug );
+		if ( $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE slug = %s LIMIT 1", $slug ) ) ) {
+			continue;
+		}
+		$data = newsletter_campaign_kit_prepare_template_data( $definition );
+		if ( is_wp_error( $data ) ) {
+			continue;
+		}
+		$inserted = $wpdb->insert(
+			$table,
+			array_merge(
+				$data,
+				array(
+					'slug'       => $slug,
+					'status'     => 'active',
+					'created_by' => 0,
+					'updated_by' => 0,
+					'created_at' => $now,
+					'updated_at' => $now,
+				)
+			),
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s' )
+		);
+		if ( false !== $inserted ) {
+			++$created;
+		}
+	}
+
+	return $created;
+}
+
+/** Return the preferred starting template for a new campaign. */
+function newsletter_campaign_kit_get_default_template_id() {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_templates_table_exists() ) {
+		return 0;
+	}
+
+	return (int) $wpdb->get_var(
+		$wpdb->prepare(
+			'SELECT id FROM ' . newsletter_campaign_kit_get_templates_table() . ' WHERE slug = %s AND status = %s LIMIT 1',
+			'editorial-letter',
+			'active'
+		)
+	);
+}
+
 /** Validate and normalize template input before persistence. */
 function newsletter_campaign_kit_prepare_template_data( $input ) {
 	$name         = isset( $input['name'] ) ? substr( sanitize_text_field( $input['name'] ), 0, 190 ) : '';

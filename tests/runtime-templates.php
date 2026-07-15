@@ -33,6 +33,9 @@ $capture_alt_body  = static function ( $phpmailer ) use ( &$captured_alt_body ) 
 try {
 	newsletter_campaign_kit_activate();
 	newsletter_templates_runtime_assert( newsletter_campaign_kit_templates_table_exists(), 'Template migration did not create its table.' );
+	$default_template_id = newsletter_campaign_kit_get_default_template_id();
+	newsletter_templates_runtime_assert( $default_template_id > 0, 'The default editorial template was not seeded.' );
+	newsletter_templates_runtime_assert( 0 === newsletter_campaign_kit_seed_default_templates(), 'Default templates are not idempotent.' );
 	$campaign_columns = $wpdb->get_col( 'SHOW COLUMNS FROM ' . newsletter_campaign_kit_get_campaigns_table() );
 	newsletter_templates_runtime_assert( in_array( 'template_id', $campaign_columns, true ) && in_array( 'text_body', $campaign_columns, true ), 'Campaign migration did not add multipart/template columns.' );
 
@@ -99,6 +102,10 @@ try {
 		'text_body'  => $content['text_body'],
 		'topic_id'   => null,
 	);
+	$wrapped_body = newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber );
+	newsletter_templates_runtime_assert( false !== strpos( $wrapped_body, '<!doctype html>' ) && false !== strpos( $wrapped_body, '<table role="presentation"' ), 'Campaign content is not wrapped in the professional email document.' );
+	newsletter_templates_runtime_assert( false !== strpos( $wrapped_body, 'Suspended light' ), 'The editorial content disappeared from the wrapped message.' );
+	newsletter_templates_runtime_assert( false !== strpos( $wrapped_body, 'Manage preferences or unsubscribe' ), 'The HTML compliance link is missing.' );
 	update_option( 'newsletter_campaign_kit_provider_settings', array( 'provider' => 'wp_mail', 'from_name' => 'PhotoVault', 'from_email' => 'wordpress@photovault.local' ), false );
 	add_action( 'phpmailer_init', $capture_alt_body, 20 );
 	$sent = newsletter_campaign_kit_send_with_wp_mail( false, $campaign, $subscriber, array() );
@@ -117,6 +124,8 @@ try {
 			'admin_ui'           => true,
 			'phpmailer_alt_body' => true,
 			'wp_mail'            => true,
+			'default_library'    => true,
+			'editorial_shell'    => true,
 		)
 	);
 } finally {

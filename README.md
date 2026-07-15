@@ -28,6 +28,8 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Modifier uniquement les brouillons et dupliquer toute campagne vers un nouveau brouillon sans etat de livraison ni file d'envoi.
 - Modifier, dupliquer, archiver et restaurer les segments avec estimation exacte de leur audience et verrou d'archivage lorsqu'une campagne non terminale les utilise.
 - Creer, modifier, dupliquer, archiver et restaurer des templates editoriaux reutilisables.
+- Installer une bibliotheque de modeles de depart sans ecraser les personnalisations administrateur.
+- Encadrer chaque campagne dans un document email responsive avec preheader, identite du site et lien de preferences.
 - Creer, modifier, dupliquer, archiver et restaurer des blocs editoriaux categorises, puis les inserer a la position du curseur dans les versions HTML et texte d'une campagne.
 - Heriter d'un template dans une campagne tout en autorisant des surcharges explicites.
 - Previsualiser les versions HTML et texte dans une page admin isolee par capability, nonce et CSP.

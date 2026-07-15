@@ -235,7 +235,14 @@ function newsletter_campaign_kit_process_queue_batch( $limit = 20 ) {
 		if ( $campaign && $subscriber ) {
 			$ineligibility_reason = newsletter_campaign_kit_get_recipient_ineligibility_reason( $subscriber, $campaign );
 			if ( '' === $ineligibility_reason ) {
-				$send = apply_filters( 'newsletter_campaign_kit_send_email', $send, $campaign, $subscriber, $item );
+				try {
+					$send = apply_filters( 'newsletter_campaign_kit_send_email', $send, $campaign, $subscriber, $item );
+				} catch ( Throwable $error ) {
+					$send = new WP_Error( 'newsletter_provider_exception', __( 'The delivery provider failed unexpectedly.', 'newsletter-campaign-kit' ) );
+					if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+						newsletter_campaign_kit_log_event( 'newsletter_provider_exception', 'failure', absint( $subscriber['id'] ), array( 'campaign_id' => absint( $campaign['id'] ) ) );
+					}
+				}
 			} else {
 				$wpdb->update(
 					$queue_table,
@@ -336,7 +343,8 @@ function newsletter_campaign_kit_handle_process_queue() {
 	}
 
 	check_admin_referer( 'newsletter_campaign_kit_process_queue' );
-	newsletter_campaign_kit_process_queue_batch( 20 );
+	$settings = newsletter_campaign_kit_get_provider_settings();
+	newsletter_campaign_kit_process_queue_batch( $settings['queue_batch_size'] );
 
 	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-queue&processed=1' ) );
 	exit;
@@ -362,10 +370,12 @@ function newsletter_campaign_kit_render_queue_page() {
 
 	$counts = newsletter_campaign_kit_get_queue_counts();
 	$items  = newsletter_campaign_kit_get_recent_queue_items();
+	$health = function_exists( 'newsletter_campaign_kit_get_scheduler_health' ) ? newsletter_campaign_kit_get_scheduler_health() : array( 'status' => 'unknown', 'message' => __( 'Scheduler health is unavailable.', 'newsletter-campaign-kit' ) );
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Delivery queue', 'newsletter-campaign-kit' ); ?></h1>
 		<p><?php esc_html_e( 'Batch delivery queue with attempts, retry backoff, wp_mail delivery, and optional external provider handoff.', 'newsletter-campaign-kit' ); ?></p>
+		<div class="notice <?php echo esc_attr( 'healthy' === $health['status'] ? 'notice-success' : ( 'pending' === $health['status'] ? 'notice-info' : 'notice-warning' ) ); ?> inline"><p><strong><?php echo esc_html( sprintf( __( 'Scheduler: %s', 'newsletter-campaign-kit' ), ucfirst( $health['status'] ) ) ); ?></strong> <?php echo esc_html( $health['message'] ); ?></p></div>
 
 		<div class="nck-grid">
 			<?php foreach ( array( 'total', 'pending', 'sent', 'failed', 'paused', 'cancelled' ) as $status ) : ?>

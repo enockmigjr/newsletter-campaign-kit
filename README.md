@@ -29,7 +29,10 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Previsualiser les versions HTML et texte dans une page admin isolee par capability, nonce et CSP.
 - Envoyer des emails `multipart/alternative` avec `AltBody` texte via le hook PHPMailer borne a l'appel `wp_mail`.
 - Executer une queue batch avec verrou atomique, reprise des verrous expires et retry/backoff.
+- Configurer la taille de batch, convertir les exceptions provider en retries et empecher le chevauchement du scheduler par verrou DB expirable.
 - Programmer les campagnes dans le fuseau WordPress et les declencher chaque minute via WP-Cron.
+- Conserver un heartbeat sans donnees personnelles et signaler les etats healthy, pending, late, failed ou unscheduled dans l'administration.
+- Supprimer transactionnellement, par lots bornes, les contacts pending dont l'expiration depasse la retention configuree.
 - Finaliser automatiquement les campagnes lorsque leur file ne contient plus de travail actif.
 - Configurer `wp_mail`, le provider JSON HTTP generique ou un adaptateur externe via filtre WordPress.
 - Envoyer au provider HTTP avec HTTPS obligatoire, Bearer secret cote serveur, corps HTML/texte et cle d'idempotence stable.
@@ -75,12 +78,18 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 
 - `newsletter_campaign_kit_version`
 - `newsletter_campaign_kit_provider_settings`
+- `newsletter_campaign_kit_scheduler_state`
+- `newsletter_campaign_kit_maintenance_state`
+
+Les options d'etat scheduler/maintenance ne contiennent que dates, duree, statuts et compteurs agreges. Elles ne stockent ni email, ni token, ni contenu de campagne.
 
 Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dkim_confirmed`. Les en-tetes RFC 8058 ne sont emis que lorsque les deux sont actifs et que l'URL publique est en HTTPS. La signature DKIM doit couvrir `List-Unsubscribe` et `List-Unsubscribe-Post`; le plugin exige une confirmation explicite car `wp_mail()` ne permet pas de prouver cette couverture avant remise au transport.
 
 Le provider HTTP lit `NEWSLETTER_CAMPAIGN_KIT_HTTP_ENDPOINT`, `NEWSLETTER_CAMPAIGN_KIT_HTTP_API_KEY`, `NEWSLETTER_CAMPAIGN_KIT_WEBHOOK_SECRET` et, facultativement, `NEWSLETTER_CAMPAIGN_KIT_HTTP_TIMEOUT`. Ces valeurs doivent etre injectees par `wp-config.php`, l'environnement ou le filtre `newsletter_campaign_kit_http_provider_config`; elles ne sont jamais stockees dans les options.
 
 Les reglages publics bornent `double_opt_in_enabled`, la validite du lien (1-168 heures), le cooldown (1-1440 minutes), les tentatives (1-30) et leur fenetre (1-1440 minutes). Le token brut n'est present que dans l'email; la table abonnes conserve son HMAC, l'expiration, la date d'envoi et la date de confirmation.
+
+Les reglages d'exploitation bornent le batch de queue (1-100), la retention des pending expires (1-90 jours) et le seuil de heartbeat tardif (2-60 minutes). Le nettoyage s'execute au plus une fois par heure et traite au maximum 200 contacts par passage.
 
 Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte un JSON `{ "id", "type", "email" }`, avec `type` egal a `bounce` ou `complaint`. Le provider signe exactement `timestamp.corps_brut` en HMAC-SHA256 dans `X-Newsletter-Signature` et fournit le timestamp Unix dans `X-Newsletter-Timestamp`.
 
@@ -150,6 +159,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 25. Executer `wp eval-file tests/runtime-http-provider.php` pour verifier transport 2xx, erreurs normalisees, configuration fail-closed, HMAC, expiration, rejeu et suppression automatique.
 26. Executer `wp eval-file tests/runtime-double-opt-in.php` pour verifier pending, HMAC, email multipart, cooldown, confirmation single-use, expiration, suppression et rate limits.
 27. Executer `wp eval-file tests/runtime-double-opt-in-http.php` pour verifier nonce, ecriture, reponse neutre, livraison Mailpit et activation par le vrai lien HTTP.
+28. Executer `wp eval-file tests/runtime-scheduler-operations.php` pour verifier retention pending, verrous, batch configure, exceptions provider et cinq etats de sante cron.
 
 ## Hooks publics
 
@@ -167,12 +177,13 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 - Bibliotheque de blocs editoriaux au-dela des templates complets.
 - Adaptateurs natifs propres aux fournisseurs (Brevo, Mailgun, Postmark, SES) au-dessus du contrat HTTP generique.
 - Validation en staging avec un domaine expediteur, DKIM et identifiants reels du fournisseur retenu.
-- Supervision des taux de confirmation, erreurs de remise et abus distribues lorsque l'hebergeur final est connu.
+- Alertes externes, metriques provider et supervision distribuee des confirmations/abus lorsque l'hebergeur final est connu.
 - Tracking ouvertures/clics et exports de reporting avances.
 
 ## References officielles
 
 - [WordPress Plugin Handbook - Cron](https://developer.wordpress.org/plugins/cron/)
+- [WordPress Code Reference - wp_next_scheduled](https://developer.wordpress.org/reference/functions/wp_next_scheduled/)
 - [WordPress Code Reference - wp_schedule_event](https://developer.wordpress.org/reference/functions/wp_schedule_event/)
 - [WordPress Code Reference - wp_clear_scheduled_hook](https://developer.wordpress.org/reference/functions/wp_clear_scheduled_hook/)
 - [WordPress Code Reference - wp_mail](https://developer.wordpress.org/reference/functions/wp_mail/)

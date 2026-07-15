@@ -21,6 +21,9 @@ function newsletter_campaign_kit_get_provider_defaults() {
 		'confirmation_resend_minutes'       => 15,
 		'subscription_attempts_per_window'  => 5,
 		'subscription_window_minutes'       => 15,
+		'queue_batch_size'                  => 20,
+		'pending_retention_days'            => 7,
+		'cron_late_after_minutes'           => 5,
 	);
 }
 
@@ -41,6 +44,9 @@ function newsletter_campaign_kit_get_provider_settings() {
 	$settings['confirmation_resend_minutes']      = max( 1, min( 1440, absint( $settings['confirmation_resend_minutes'] ) ) );
 	$settings['subscription_attempts_per_window'] = max( 1, min( 30, absint( $settings['subscription_attempts_per_window'] ) ) );
 	$settings['subscription_window_minutes']      = max( 1, min( 1440, absint( $settings['subscription_window_minutes'] ) ) );
+	$settings['queue_batch_size']                 = max( 1, min( 100, absint( $settings['queue_batch_size'] ) ) );
+	$settings['pending_retention_days']           = max( 1, min( 90, absint( $settings['pending_retention_days'] ) ) );
+	$settings['cron_late_after_minutes']          = max( 2, min( 60, absint( $settings['cron_late_after_minutes'] ) ) );
 
 	return $settings;
 }
@@ -66,6 +72,9 @@ function newsletter_campaign_kit_save_provider_settings() {
 		'confirmation_resend_minutes'      => isset( $_POST['confirmation_resend_minutes'] ) ? max( 1, min( 1440, absint( $_POST['confirmation_resend_minutes'] ) ) ) : 15,
 		'subscription_attempts_per_window' => isset( $_POST['subscription_attempts_per_window'] ) ? max( 1, min( 30, absint( $_POST['subscription_attempts_per_window'] ) ) ) : 5,
 		'subscription_window_minutes'      => isset( $_POST['subscription_window_minutes'] ) ? max( 1, min( 1440, absint( $_POST['subscription_window_minutes'] ) ) ) : 15,
+		'queue_batch_size'                 => isset( $_POST['queue_batch_size'] ) ? max( 1, min( 100, absint( $_POST['queue_batch_size'] ) ) ) : 20,
+		'pending_retention_days'           => isset( $_POST['pending_retention_days'] ) ? max( 1, min( 90, absint( $_POST['pending_retention_days'] ) ) ) : 7,
+		'cron_late_after_minutes'          => isset( $_POST['cron_late_after_minutes'] ) ? max( 2, min( 60, absint( $_POST['cron_late_after_minutes'] ) ) ) : 5,
 	);
 
 	update_option( 'newsletter_campaign_kit_provider_settings', $settings, false );
@@ -125,6 +134,15 @@ function newsletter_campaign_kit_render_settings_page() {
 						<strong><?php echo esc_html( ! empty( $http_status['delivery_ready'] ) ? __( 'Delivery configured', 'newsletter-campaign-kit' ) : __( 'Delivery not configured', 'newsletter-campaign-kit' ) ); ?></strong><br>
 						<span><?php echo esc_html( ! empty( $http_status['webhook_ready'] ) ? __( 'Signed provider webhook configured.', 'newsletter-campaign-kit' ) : __( 'Signed provider webhook not configured.', 'newsletter-campaign-kit' ) ); ?></span>
 						<p class="description"><?php esc_html_e( 'Define the endpoint, API key and webhook secret outside the database. Secret values are never displayed.', 'newsletter-campaign-kit' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Delivery operations', 'newsletter-campaign-kit' ); ?></th>
+					<td>
+						<p><label><?php esc_html_e( 'Queue batch size', 'newsletter-campaign-kit' ); ?> <input class="small-text" type="number" min="1" max="100" name="queue_batch_size" value="<?php echo esc_attr( $settings['queue_batch_size'] ); ?>"></label></p>
+						<p><label><?php esc_html_e( 'Expired pending retention (days)', 'newsletter-campaign-kit' ); ?> <input class="small-text" type="number" min="1" max="90" name="pending_retention_days" value="<?php echo esc_attr( $settings['pending_retention_days'] ); ?>"></label></p>
+						<p><label><?php esc_html_e( 'Cron considered late after (minutes)', 'newsletter-campaign-kit' ); ?> <input class="small-text" type="number" min="2" max="60" name="cron_late_after_minutes" value="<?php echo esc_attr( $settings['cron_late_after_minutes'] ); ?>"></label></p>
+						<p class="description"><?php esc_html_e( 'Expired pending contacts are removed in bounded hourly maintenance. Queue health is shown without subscriber data.', 'newsletter-campaign-kit' ); ?></p>
 					</td>
 				</tr>
 				<tr>

@@ -22,6 +22,8 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Exclure les opt-out thematiques et suppressions a la resolution d'audience puis juste avant le provider.
 - Conserver une suppression durable par HMAC apres suppression ou re-import du contact, avec levee admin explicite sans reabonnement automatique.
 - Creer des brouillons de campagnes avec sujet, contenu, cible editoriale et transitions serveur.
+- Imposer une revue finale avant envoi ou programmation avec audience estimee, saisie exacte du titre, nonce et empreinte HMAC de la campagne et des destinataires.
+- Rejeter sans effet de bord une confirmation devenue obsolete, puis figer l'audience dans la meme transaction que l'envoi immediat ou la programmation.
 - Modifier uniquement les brouillons et dupliquer toute campagne vers un nouveau brouillon sans etat de livraison ni file d'envoi.
 - Modifier, dupliquer, archiver et restaurer les segments avec estimation exacte de leur audience et verrou d'archivage lorsqu'une campagne non terminale les utilise.
 - Creer, modifier, dupliquer, archiver et restaurer des templates editoriaux reutilisables.
@@ -39,7 +41,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Recevoir les bounces et complaints via un webhook REST signe HMAC, borne a cinq minutes et protege contre le rejeu.
 - Afficher un reporting de livraison par campagne depuis la queue.
 - Capturer une fois l'audience au premier envoi avec regles, libelles et IDs internes des destinataires, puis reutiliser ce snapshot immutable aux relances; apres effacement, l'ID devient une cle opaque propre au snapshot.
-- Creer snapshot, membres et queue dans la meme transaction pour les envois manuels et programmes.
+- Creer snapshot, membres et queue dans la meme transaction pour l'envoi immediat; pour une programmation, figer snapshot et membres a la confirmation puis creer la queue depuis cet instantane au declenchement WP-Cron.
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
 - Integrer les exports, effacements et le guide de confidentialite natifs de WordPress.
 - Exposer aux integrations serveur l'abonnement correspondant a l'e-mail du compte, sans endpoint public de recherche.
@@ -160,6 +162,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 26. Executer `wp eval-file tests/runtime-double-opt-in.php` pour verifier pending, HMAC, email multipart, cooldown, confirmation single-use, expiration, suppression et rate limits.
 27. Executer `wp eval-file tests/runtime-double-opt-in-http.php` pour verifier nonce, ecriture, reponse neutre, livraison Mailpit et activation par le vrai lien HTTP.
 28. Executer `wp eval-file tests/runtime-scheduler-operations.php` pour verifier retention pending, verrous, batch configure, exceptions provider et cinq etats de sante cron.
+29. Executer `wp eval-file tests/runtime-campaign-confirmation.php` pour verifier titre exact, preuve d'audience obsolete, atomicite de l'envoi, reprise apres pause, audience programmee figee et ecran de revue admin.
 
 ## Hooks publics
 

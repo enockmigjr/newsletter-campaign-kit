@@ -43,7 +43,7 @@ function newsletter_campaign_kit_get_campaign_recipients( $campaign ) {
 	return newsletter_campaign_kit_filter_campaign_recipients( $recipients, $topic_id );
 }
 
-function newsletter_campaign_kit_enqueue_campaign( $campaign_id, $manage_transaction = true ) {
+function newsletter_campaign_kit_enqueue_campaign( $campaign_id, $manage_transaction = true, $expected_fingerprint = '' ) {
 	global $wpdb;
 
 	$campaign = newsletter_campaign_kit_get_campaign( $campaign_id );
@@ -64,6 +64,15 @@ function newsletter_campaign_kit_enqueue_campaign( $campaign_id, $manage_transac
 		}
 		return new WP_Error( 'newsletter_campaign_not_found', __( 'Campaign not found.', 'newsletter-campaign-kit' ) );
 	}
+	if ( '' !== $expected_fingerprint ) {
+		$review = newsletter_campaign_kit_prepare_campaign_delivery_review( $locked_campaign );
+		if ( is_wp_error( $review ) || ! hash_equals( $review['fingerprint'], sanitize_text_field( $expected_fingerprint ) ) ) {
+			if ( $manage_transaction ) {
+				$wpdb->query( 'ROLLBACK' );
+			}
+			return new WP_Error( 'newsletter_campaign_review_stale', __( 'The campaign or its audience changed. Review the delivery again.', 'newsletter-campaign-kit' ) );
+		}
+	}
 	$snapshot = newsletter_campaign_kit_get_campaign_audience_snapshot( $campaign_id );
 	if ( ! $snapshot ) {
 		$recipients = newsletter_campaign_kit_get_campaign_recipients( $locked_campaign );
@@ -76,6 +85,16 @@ function newsletter_campaign_kit_enqueue_campaign( $campaign_id, $manage_transac
 		}
 	}
 	$recipient_ids = newsletter_campaign_kit_get_audience_snapshot_member_ids( $snapshot['id'] );
+	if ( 'paused' === $locked_campaign['status'] ) {
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$queue_table} SET status = 'pending', next_attempt_at = %s, updated_at = %s WHERE campaign_id = %d AND status = 'paused'",
+				$now,
+				$now,
+				$campaign_id
+			)
+		);
+	}
 
 	foreach ( $recipient_ids as $subscriber_id ) {
 		$ok = $wpdb->query(

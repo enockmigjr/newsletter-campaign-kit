@@ -1,5 +1,14 @@
 # Newsletter Campaign Kit
 
+## Fournisseurs d'envoi
+
+- Brevo recommande: `NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY`.
+- Resend alternatif: `NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY`.
+- `wp_mail`: compatible avec le relais SMTP WordPress et l'environnement local.
+- API HTTP generique et filtre externe: conserves pour les integrations sur mesure.
+
+Les adaptateurs natifs utilisent des endpoints HTTPS fixes, une cle d'idempotence stable par livraison et des secrets injectes cote serveur, jamais enregistres dans WordPress.
+
 Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnements consentis, la desinscription tokenisee et la fondation des futures campagnes editoriales.
 
 ## Responsabilites

@@ -10,8 +10,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 function newsletter_campaign_kit_get_provider_defaults() {
+	$brevo_key       = defined( 'NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY' ) ? trim( (string) NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY ) : trim( (string) getenv( 'NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY' ) );
+	$default_provider = '' !== $brevo_key ? 'brevo' : 'wp_mail';
+
 	return array(
-		'provider'          => 'wp_mail',
+		'provider'          => $default_provider,
 		'from_name'         => get_bloginfo( 'name' ),
 		'from_email'        => get_option( 'admin_email' ),
 		'one_click_enabled' => false,
@@ -34,7 +37,7 @@ function newsletter_campaign_kit_get_provider_settings() {
 	}
 
 	$settings = wp_parse_args( $settings, newsletter_campaign_kit_get_provider_defaults() );
-	$settings['provider']   = in_array( $settings['provider'], array( 'wp_mail', 'http_api', 'external_filter' ), true ) ? $settings['provider'] : 'wp_mail';
+	$settings['provider']   = in_array( $settings['provider'], array( 'wp_mail', 'brevo', 'resend', 'http_api', 'external_filter' ), true ) ? $settings['provider'] : 'wp_mail';
 	$settings['from_name']  = substr( sanitize_text_field( $settings['from_name'] ), 0, 120 );
 	$settings['from_email'] = sanitize_email( $settings['from_email'] );
 	$settings['one_click_enabled'] = ! empty( $settings['one_click_enabled'] );
@@ -62,7 +65,7 @@ function newsletter_campaign_kit_save_provider_settings() {
 	$from_name  = isset( $_POST['from_name'] ) ? sanitize_text_field( wp_unslash( $_POST['from_name'] ) ) : '';
 	$from_email = isset( $_POST['from_email'] ) ? sanitize_email( wp_unslash( $_POST['from_email'] ) ) : '';
 	$settings   = array(
-		'provider'          => in_array( $provider, array( 'wp_mail', 'http_api', 'external_filter' ), true ) ? $provider : 'wp_mail',
+		'provider'          => in_array( $provider, array( 'wp_mail', 'brevo', 'resend', 'http_api', 'external_filter' ), true ) ? $provider : 'wp_mail',
 		'from_name'         => substr( $from_name, 0, 120 ),
 		'from_email'        => is_email( $from_email ) ? $from_email : get_option( 'admin_email' ),
 		'one_click_enabled' => ! empty( $_POST['one_click_enabled'] ),
@@ -109,6 +112,7 @@ function newsletter_campaign_kit_render_settings_page() {
 	$unsubscribe_url = newsletter_campaign_kit_get_unsubscribe_url( str_repeat( 'a', 64 ) );
 	$is_https        = 'https' === wp_parse_url( $unsubscribe_url, PHP_URL_SCHEME );
 	$http_status     = function_exists( 'newsletter_campaign_kit_get_http_provider_status' ) ? newsletter_campaign_kit_get_http_provider_status() : array();
+	$native_status   = function_exists( 'newsletter_campaign_kit_get_native_provider_status' ) ? newsletter_campaign_kit_get_native_provider_status() : array();
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Newsletter settings', 'newsletter-campaign-kit' ); ?></h1>
@@ -122,10 +126,20 @@ function newsletter_campaign_kit_render_settings_page() {
 					<td>
 						<select id="provider" name="provider">
 							<option value="wp_mail" <?php selected( $settings['provider'], 'wp_mail' ); ?>><?php esc_html_e( 'WordPress wp_mail', 'newsletter-campaign-kit' ); ?></option>
+							<option value="brevo" <?php selected( $settings['provider'], 'brevo' ); ?>><?php esc_html_e( 'Brevo API (recommended)', 'newsletter-campaign-kit' ); ?></option>
+							<option value="resend" <?php selected( $settings['provider'], 'resend' ); ?>><?php esc_html_e( 'Resend API', 'newsletter-campaign-kit' ); ?></option>
 							<option value="http_api" <?php selected( $settings['provider'], 'http_api' ); ?>><?php esc_html_e( 'Generic HTTP API', 'newsletter-campaign-kit' ); ?></option>
 							<option value="external_filter" <?php selected( $settings['provider'], 'external_filter' ); ?>><?php esc_html_e( 'External filter/API adapter', 'newsletter-campaign-kit' ); ?></option>
 						</select>
-						<p class="description"><?php esc_html_e( 'wp_mail uses the WordPress mail stack. Generic HTTP API uses server-side constants or filters. External filter lets another plugin return the delivery result.', 'newsletter-campaign-kit' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Brevo and Resend use fixed HTTPS endpoints and server-side API keys. wp_mail keeps the WordPress SMTP stack available for local and custom installations.', 'newsletter-campaign-kit' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Native provider readiness', 'newsletter-campaign-kit' ); ?></th>
+					<td>
+						<p><strong>Brevo:</strong> <?php echo esc_html( ! empty( $native_status['brevo'] ) ? __( 'Ready', 'newsletter-campaign-kit' ) : __( 'API key missing', 'newsletter-campaign-kit' ) ); ?></p>
+						<p><strong>Resend:</strong> <?php echo esc_html( ! empty( $native_status['resend'] ) ? __( 'Ready', 'newsletter-campaign-kit' ) : __( 'API key missing', 'newsletter-campaign-kit' ) ); ?></p>
+						<p class="description"><?php esc_html_e( 'Define NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY or NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY in the server environment. Secret values are never stored or displayed.', 'newsletter-campaign-kit' ); ?></p>
 					</td>
 				</tr>
 				<tr>

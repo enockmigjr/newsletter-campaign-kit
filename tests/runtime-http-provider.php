@@ -38,6 +38,10 @@ $runtime_config    = array(
 );
 $http_mode         = 'success';
 $captured_request  = array();
+$native_secrets    = array(
+	'NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY'  => 'runtime-brevo-key',
+	'NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY' => 'runtime-resend-key',
+);
 
 $config_filter = static function () use ( &$runtime_config ) {
 	return $runtime_config;
@@ -58,9 +62,13 @@ $http_filter = static function ( $preempt, $args, $url ) use ( &$http_mode, &$ca
 		'filename' => null,
 	);
 };
+$secret_filter = static function ( $value, $name ) use ( &$native_secrets ) {
+	return $native_secrets[ $name ] ?? $value;
+};
 
 add_filter( 'newsletter_campaign_kit_http_provider_config', $config_filter );
 add_filter( 'pre_http_request', $http_filter, 10, 3 );
+add_filter( 'newsletter_campaign_kit_delivery_secret', $secret_filter, 10, 2 );
 
 try {
 	newsletter_campaign_kit_activate();
@@ -116,6 +124,25 @@ try {
 	newsletter_http_runtime_assert( is_wp_error( $sent ) && 'newsletter_http_provider_not_configured' === $sent->get_error_code(), 'Missing provider secret did not fail closed.' );
 	$runtime_config['api_key'] = 'runtime-provider-api-key';
 
+	update_option( 'newsletter_campaign_kit_provider_settings', array( 'provider' => 'brevo', 'from_name' => 'PhotoVault', 'from_email' => 'sender@photovault.test' ), false );
+	$http_mode = 'success';
+	$sent      = newsletter_campaign_kit_send_with_brevo( false, $campaign, $subscriber, $queue_item );
+	$body      = json_decode( $captured_request['args']['body'], true );
+	newsletter_http_runtime_assert( true === $sent && 'https://api.brevo.com/v3/smtp/email' === $captured_request['url'], 'Brevo delivery did not use its fixed endpoint.' );
+	newsletter_http_runtime_assert( 'runtime-brevo-key' === $captured_request['args']['headers']['api-key'] && $email === $body['to'][0]['email'], 'Brevo payload or authentication is invalid.' );
+	newsletter_http_runtime_assert( false !== strpos( $body['htmlContent'], '<!doctype html>' ) && false !== strpos( $body['textContent'], 'Runtime HTTP body' ), 'Brevo payload omitted HTML or text content.' );
+
+	update_option( 'newsletter_campaign_kit_provider_settings', array( 'provider' => 'resend', 'from_name' => 'PhotoVault', 'from_email' => 'sender@photovault.test' ), false );
+	$sent = newsletter_campaign_kit_send_with_resend( false, $campaign, $subscriber, $queue_item );
+	$body = json_decode( $captured_request['args']['body'], true );
+	newsletter_http_runtime_assert( true === $sent && 'https://api.resend.com/emails' === $captured_request['url'], 'Resend delivery did not use its fixed endpoint.' );
+	newsletter_http_runtime_assert( 'Bearer runtime-resend-key' === $captured_request['args']['headers']['Authorization'] && $email === $body['to'][0], 'Resend payload or authentication is invalid.' );
+	newsletter_http_runtime_assert( newsletter_campaign_kit_get_delivery_idempotency_key( $campaign, $subscriber, $queue_item ) === $captured_request['args']['headers']['Idempotency-Key'], 'Native provider idempotency is not stable.' );
+	$native_secrets['NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY'] = '';
+	$sent = newsletter_campaign_kit_send_with_resend( false, $campaign, $subscriber, $queue_item );
+	newsletter_http_runtime_assert( is_wp_error( $sent ) && 'newsletter_resend_not_configured' === $sent->get_error_code(), 'Missing Resend secret did not fail closed.' );
+	$native_secrets['NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY'] = 'runtime-resend-key';
+
 	do_action( 'rest_api_init', rest_get_server() );
 	newsletter_http_runtime_assert( isset( rest_get_server()->get_routes()['/newsletter-campaign-kit/v1/provider-events'] ), 'Signed provider REST route was not registered.' );
 	$valid_body = wp_json_encode( array( 'id' => $event_ids[0], 'type' => 'complaint', 'email' => $email ) );
@@ -160,6 +187,7 @@ try {
 	echo wp_json_encode(
 		array(
 			'http_delivery'       => 'success_and_fail_closed',
+			'native_delivery'     => array( 'brevo', 'resend' ),
 			'idempotency'         => 'stable_delivery_and_webhook_replay',
 			'webhook_signature'   => 'hmac_timestamp_validated',
 			'suppression'         => 'complaint_applied_and_queue_cancelled',
@@ -169,6 +197,7 @@ try {
 } finally {
 	remove_filter( 'newsletter_campaign_kit_http_provider_config', $config_filter );
 	remove_filter( 'pre_http_request', $http_filter, 10 );
+	remove_filter( 'newsletter_campaign_kit_delivery_secret', $secret_filter, 10 );
 	update_option( 'newsletter_campaign_kit_provider_settings', $old_provider, false );
 	foreach ( $event_keys as $event_key ) {
 		$wpdb->delete( $events_table, array( 'event_key' => $event_key ), array( '%s' ) );

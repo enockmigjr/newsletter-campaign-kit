@@ -130,20 +130,32 @@ function newsletter_campaign_kit_release_suppression( $suppression_id ) {
 }
 
 /** Fetch recent suppression entries without exposing hashes in full. */
-function newsletter_campaign_kit_get_suppressions( $limit = 50 ) {
+function newsletter_campaign_kit_get_suppressions( $limit = 50, $offset = 0 ) {
 	global $wpdb;
 
 	$table       = newsletter_campaign_kit_get_suppressions_table();
 	$subscribers = newsletter_campaign_kit_get_subscribers_table();
 	$limit       = max( 1, min( 100, absint( $limit ) ) );
+	$offset      = absint( $offset );
 	if ( ! newsletter_campaign_kit_table_exists( $table ) ) {
 		return array();
 	}
 
 	$sql = "SELECT sp.id, sp.email_hash, sp.subscriber_id, sp.status, sp.reason, sp.source, sp.created_at, sp.updated_at, sp.released_at, s.email
-		FROM {$table} sp LEFT JOIN {$subscribers} s ON s.id = sp.subscriber_id ORDER BY sp.updated_at DESC LIMIT %d";
+		FROM {$table} sp LEFT JOIN {$subscribers} s ON s.id = sp.subscriber_id ORDER BY sp.updated_at DESC LIMIT %d OFFSET %d";
 
-	return $wpdb->get_results( $wpdb->prepare( $sql, $limit ), ARRAY_A );
+	return $wpdb->get_results( $wpdb->prepare( $sql, $limit, $offset ), ARRAY_A );
+}
+
+function newsletter_campaign_kit_count_suppressions() {
+	global $wpdb;
+
+	$table = newsletter_campaign_kit_get_suppressions_table();
+	if ( ! newsletter_campaign_kit_table_exists( $table ) ) {
+		return 0;
+	}
+
+	return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
 }
 
 /** Apply a subscriber status transition with suppression and queue invariants. */

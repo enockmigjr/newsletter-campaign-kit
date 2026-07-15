@@ -38,7 +38,7 @@ function newsletter_campaign_kit_get_allowed_campaign_transitions() {
 	);
 }
 
-function newsletter_campaign_kit_get_campaigns( $limit = 50 ) {
+function newsletter_campaign_kit_get_campaigns( $limit = 50, $offset = 0 ) {
 	global $wpdb;
 
 	if ( ! newsletter_campaign_kit_campaigns_table_exists() ) {
@@ -47,8 +47,19 @@ function newsletter_campaign_kit_get_campaigns( $limit = 50 ) {
 
 	$table = newsletter_campaign_kit_get_campaigns_table();
 	$limit = max( 1, min( 100, absint( $limit ) ) );
+	$offset = absint( $offset );
 
-	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY updated_at DESC LIMIT %d", $limit ), ARRAY_A );
+	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY updated_at DESC LIMIT %d OFFSET %d", $limit, $offset ), ARRAY_A );
+}
+
+function newsletter_campaign_kit_count_campaigns() {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_campaigns_table_exists() ) {
+		return 0;
+	}
+
+	return (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . newsletter_campaign_kit_get_campaigns_table() );
 }
 
 function newsletter_campaign_kit_get_campaign( $campaign_id ) {
@@ -697,7 +708,10 @@ function newsletter_campaign_kit_render_campaigns_page() {
 		wp_die( esc_html__( 'You are not allowed to manage newsletter campaigns.', 'newsletter-campaign-kit' ) );
 	}
 
-	$campaigns = newsletter_campaign_kit_get_campaigns();
+	$current_page = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+	$per_page     = 25;
+	$campaigns    = newsletter_campaign_kit_get_campaigns( $per_page, ( $current_page - 1 ) * $per_page );
+	$total        = newsletter_campaign_kit_count_campaigns();
 	$lists     = function_exists( 'newsletter_campaign_kit_get_lists' ) ? newsletter_campaign_kit_get_lists() : array();
 	$segments  = function_exists( 'newsletter_campaign_kit_get_segments' ) ? newsletter_campaign_kit_get_segments() : array();
 	$topics    = function_exists( 'newsletter_campaign_kit_get_topics' ) ? newsletter_campaign_kit_get_topics() : array();
@@ -792,7 +806,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 		</section>
 
 		<h2><?php esc_html_e( 'Campaign pipeline', 'newsletter-campaign-kit' ); ?></h2>
-		<table class="widefat fixed striped">
+		<div class="nck-table-wrap"><table class="widefat fixed striped">
 			<thead><tr><th><?php esc_html_e( 'Title', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Topic', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Audience', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Recipients', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Scheduled', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Updated', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Actions', 'newsletter-campaign-kit' ); ?></th></tr></thead>
 			<tbody>
 			<?php if ( empty( $campaigns ) ) : ?><tr><td colspan="8"><?php esc_html_e( 'No campaign draft yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
@@ -819,7 +833,8 @@ function newsletter_campaign_kit_render_campaigns_page() {
 				</tr>
 			<?php endforeach; ?>
 			</tbody>
-		</table>
+		</table></div>
+		<?php newsletter_campaign_kit_render_pagination( $current_page, $total, $per_page, array( 'page' => 'newsletter-campaign-kit-campaigns' ) ); ?>
 	</div>
 	<style>.newsletter-campaign-kit-admin .nck-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;margin:18px 0;padding:16px}.newsletter-campaign-kit-admin .nck-inline-actions,.newsletter-campaign-kit-admin .nck-block-inserter{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.newsletter-campaign-kit-admin .nck-block-inserter{margin:16px 0}.newsletter-campaign-kit-admin .nck-block-inserter .dashicons{vertical-align:text-bottom}</style>
 	<?php

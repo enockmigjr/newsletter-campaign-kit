@@ -183,6 +183,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 29. Executer `wp eval-file tests/runtime-campaign-confirmation.php` pour verifier titre exact, preuve d'audience obsolete, atomicite de l'envoi, reprise apres pause, audience programmee figee et ecran de revue admin.
 30. Executer `wp eval-file tests/runtime-editorial-blocks.php` puis `node tests/campaign-blocks.js` pour verifier migration, sanitization, lifecycle, capability et insertion HTML/texte au curseur.
 31. Executer `wp eval-file tests/runtime-advanced-exports.php` pour verifier exports audiences/campagnes, pagination complete des abonnes, UTF-8, anti-formule CSV, capability et nonce.
+32. Executer `wp eval-file tests/runtime-admin-pagination.php` pour verifier pagination et filtres des abonnes, suppressions, audits, campagnes, modeles, blocs et file de livraison.
 
 ## Hooks publics
 
@@ -199,7 +200,7 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 ## Reste majeur
 
 - Export avance des listes, tags et segments (l'import CSV des abonnes et de leurs affectations est operationnel).
-- Adaptateurs natifs propres aux fournisseurs (Brevo, Mailgun, Postmark, SES) au-dessus du contrat HTTP generique.
+- Adaptateurs supplementaires (Mailgun, Postmark ou SES) uniquement si le fournisseur d'hebergement retenu l'exige; Brevo et Resend sont deja natifs.
 - Validation en staging avec un domaine expediteur, DKIM et identifiants reels du fournisseur retenu.
 - Alertes externes, metriques provider et supervision distribuee des confirmations/abus lorsque l'hebergeur final est connu.
 - Tracking ouvertures/clics avec consentement et statistiques associees.

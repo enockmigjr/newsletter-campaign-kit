@@ -51,7 +51,7 @@ function newsletter_campaign_kit_get_template( $template_id ) {
 	return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $template_id ), ARRAY_A );
 }
 
-function newsletter_campaign_kit_get_templates( $include_archived = false ) {
+function newsletter_campaign_kit_get_templates( $include_archived = false, $limit = 100, $offset = 0 ) {
 	global $wpdb;
 
 	if ( ! newsletter_campaign_kit_templates_table_exists() ) {
@@ -59,11 +59,28 @@ function newsletter_campaign_kit_get_templates( $include_archived = false ) {
 	}
 
 	$table = newsletter_campaign_kit_get_templates_table();
+	$limit = max( 1, min( 100, absint( $limit ) ) );
+	$offset = absint( $offset );
 	if ( $include_archived ) {
-		return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY updated_at DESC LIMIT 100", ARRAY_A );
+		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY updated_at DESC LIMIT %d OFFSET %d", $limit, $offset ), ARRAY_A );
 	}
 
-	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY updated_at DESC LIMIT 100", 'active' ), ARRAY_A );
+	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY updated_at DESC LIMIT %d OFFSET %d", 'active', $limit, $offset ), ARRAY_A );
+}
+
+function newsletter_campaign_kit_count_templates( $include_archived = false ) {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_templates_table_exists() ) {
+		return 0;
+	}
+
+	$table = newsletter_campaign_kit_get_templates_table();
+	if ( $include_archived ) {
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+	}
+
+	return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE status = %s", 'active' ) );
 }
 
 /** Return the immutable definitions used to initialize a useful template library. */
@@ -367,7 +384,10 @@ function newsletter_campaign_kit_render_templates_page() {
 	$editing  = $edit_id ? newsletter_campaign_kit_get_template( $edit_id ) : null;
 	$defaults = array( 'id' => 0, 'name' => '', 'subject' => '', 'preview_text' => '', 'html_body' => '', 'text_body' => '' );
 	$form     = wp_parse_args( $editing ?: array(), $defaults );
-	$templates = newsletter_campaign_kit_get_templates( true );
+	$current_page = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+	$per_page     = 25;
+	$templates    = newsletter_campaign_kit_get_templates( true, $per_page, ( $current_page - 1 ) * $per_page );
+	$total        = newsletter_campaign_kit_count_templates( true );
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Email templates', 'newsletter-campaign-kit' ); ?></h1>
@@ -388,7 +408,7 @@ function newsletter_campaign_kit_render_templates_page() {
 			</form>
 		</section>
 		<h2><?php esc_html_e( 'Template library', 'newsletter-campaign-kit' ); ?></h2>
-		<table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Name', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subject', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Actions', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
+		<div class="nck-table-wrap"><table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Name', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subject', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Actions', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
 		<?php if ( empty( $templates ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No reusable template yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
 		<?php foreach ( $templates as $template ) : ?>
 			<tr><td><strong><?php echo esc_html( $template['name'] ); ?></strong></td><td><?php echo esc_html( $template['subject'] ); ?></td><td><?php echo esc_html( $template['status'] ); ?></td><td><div class="nck-inline-actions">
@@ -398,7 +418,8 @@ function newsletter_campaign_kit_render_templates_page() {
 				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="newsletter_campaign_kit_template_action"><input type="hidden" name="template_id" value="<?php echo esc_attr( $template['id'] ); ?>"><input type="hidden" name="template_operation" value="<?php echo esc_attr( 'active' === $template['status'] ? 'archive' : 'restore' ); ?>"><?php wp_nonce_field( 'newsletter_campaign_kit_template_action_' . absint( $template['id'] ) ); ?><button class="button button-small"><?php echo esc_html( 'active' === $template['status'] ? __( 'Archive', 'newsletter-campaign-kit' ) : __( 'Restore', 'newsletter-campaign-kit' ) ); ?></button></form>
 			</div></td></tr>
 		<?php endforeach; ?>
-		</tbody></table>
+		</tbody></table></div>
+		<?php newsletter_campaign_kit_render_pagination( $current_page, $total, $per_page, array( 'page' => 'newsletter-campaign-kit-templates' ) ); ?>
 	</div>
 	<style>.newsletter-campaign-kit-admin .nck-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;margin:18px 0;padding:16px}.newsletter-campaign-kit-admin .nck-inline-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.newsletter-campaign-kit-admin .nck-inline-actions form{margin:0}</style>
 	<?php

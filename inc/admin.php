@@ -244,7 +244,10 @@ function newsletter_campaign_kit_render_subscribers_page() {
 	);
 	$filtered_total = newsletter_campaign_kit_count_subscribers( array( 'status' => $status, 'search' => $search ) );
 	$counts      = newsletter_campaign_kit_get_subscriber_counts();
-	$suppressions = newsletter_campaign_kit_get_suppressions( 50 );
+	$suppression_page     = isset( $_GET['suppression_page'] ) ? max( 1, absint( $_GET['suppression_page'] ) ) : 1;
+	$suppression_per_page = 20;
+	$suppressions         = newsletter_campaign_kit_get_suppressions( $suppression_per_page, ( $suppression_page - 1 ) * $suppression_per_page );
+	$suppression_total    = newsletter_campaign_kit_count_suppressions();
 	$export_url  = wp_nonce_url( admin_url( 'admin-post.php?action=newsletter_campaign_kit_export_subscribers' ), 'newsletter_campaign_kit_export_subscribers' );
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
@@ -324,6 +327,7 @@ function newsletter_campaign_kit_render_subscribers_page() {
 			</tr><?php endforeach; ?>
 			</tbody>
 		</table></div>
+		<?php newsletter_campaign_kit_render_pagination( $suppression_page, $suppression_total, $suppression_per_page, array( 'page' => 'newsletter-campaign-kit', 'status' => $status, 's' => $search, 'paged' => $current_page ), 'suppression_page' ); ?>
 	</div>
 	<?php
 }

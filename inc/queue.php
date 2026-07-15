@@ -194,7 +194,7 @@ function newsletter_campaign_kit_get_queue_counts( $campaign_id = 0 ) {
 	return $empty;
 }
 
-function newsletter_campaign_kit_get_recent_queue_items( $limit = 80 ) {
+function newsletter_campaign_kit_get_recent_queue_items( $limit = 80, $offset = 0, $status = '' ) {
 	global $wpdb;
 
 	if ( ! newsletter_campaign_kit_queue_table_exists() ) {
@@ -204,10 +204,36 @@ function newsletter_campaign_kit_get_recent_queue_items( $limit = 80 ) {
 	$queue_table     = newsletter_campaign_kit_get_queue_table();
 	$campaigns_table = newsletter_campaign_kit_get_campaigns_table();
 	$limit           = max( 1, min( 150, absint( $limit ) ) );
+	$offset          = absint( $offset );
+	$status          = sanitize_key( $status );
+	$statuses        = array( 'pending', 'processing', 'sent', 'failed', 'paused', 'cancelled' );
 
-	$sql = "SELECT q.*, c.title AS campaign_title FROM {$queue_table} q LEFT JOIN {$campaigns_table} c ON c.id = q.campaign_id ORDER BY q.updated_at DESC LIMIT %d";
+	if ( in_array( $status, $statuses, true ) ) {
+		$sql = "SELECT q.*, c.title AS campaign_title FROM {$queue_table} q LEFT JOIN {$campaigns_table} c ON c.id = q.campaign_id WHERE q.status = %s ORDER BY q.updated_at DESC LIMIT %d OFFSET %d";
 
-	return $wpdb->get_results( $wpdb->prepare( $sql, $limit ), ARRAY_A );
+		return $wpdb->get_results( $wpdb->prepare( $sql, $status, $limit, $offset ), ARRAY_A );
+	}
+
+	$sql = "SELECT q.*, c.title AS campaign_title FROM {$queue_table} q LEFT JOIN {$campaigns_table} c ON c.id = q.campaign_id ORDER BY q.updated_at DESC LIMIT %d OFFSET %d";
+
+	return $wpdb->get_results( $wpdb->prepare( $sql, $limit, $offset ), ARRAY_A );
+}
+
+function newsletter_campaign_kit_count_queue_items( $status = '' ) {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_queue_table_exists() ) {
+		return 0;
+	}
+
+	$table    = newsletter_campaign_kit_get_queue_table();
+	$status   = sanitize_key( $status );
+	$statuses = array( 'pending', 'processing', 'sent', 'failed', 'paused', 'cancelled' );
+	if ( in_array( $status, $statuses, true ) ) {
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE status = %s", $status ) );
+	}
+
+	return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
 }
 
 function newsletter_campaign_kit_process_queue_batch( $limit = 20 ) {
@@ -387,9 +413,15 @@ function newsletter_campaign_kit_render_queue_page() {
 		wp_die( esc_html__( 'You are not allowed to view newsletter deliveries.', 'newsletter-campaign-kit' ) );
 	}
 
-	$counts = newsletter_campaign_kit_get_queue_counts();
-	$items  = newsletter_campaign_kit_get_recent_queue_items();
-	$health = function_exists( 'newsletter_campaign_kit_get_scheduler_health' ) ? newsletter_campaign_kit_get_scheduler_health() : array( 'status' => 'unknown', 'message' => __( 'Scheduler health is unavailable.', 'newsletter-campaign-kit' ) );
+	$allowed_statuses = array( 'pending', 'processing', 'sent', 'failed', 'paused', 'cancelled' );
+	$status           = isset( $_GET['status'] ) ? sanitize_key( wp_unslash( $_GET['status'] ) ) : '';
+	$status           = in_array( $status, $allowed_statuses, true ) ? $status : '';
+	$current_page     = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+	$per_page         = 30;
+	$counts           = newsletter_campaign_kit_get_queue_counts();
+	$items            = newsletter_campaign_kit_get_recent_queue_items( $per_page, ( $current_page - 1 ) * $per_page, $status );
+	$total            = newsletter_campaign_kit_count_queue_items( $status );
+	$health           = function_exists( 'newsletter_campaign_kit_get_scheduler_health' ) ? newsletter_campaign_kit_get_scheduler_health() : array( 'status' => 'unknown', 'message' => __( 'Scheduler health is unavailable.', 'newsletter-campaign-kit' ) );
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Delivery queue', 'newsletter-campaign-kit' ); ?></h1>
@@ -408,7 +440,18 @@ function newsletter_campaign_kit_render_queue_page() {
 			<?php submit_button( __( 'Process next batch', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 		</form>
 
-		<table class="widefat fixed striped">
+		<form method="GET" class="nck-filters">
+			<input type="hidden" name="page" value="newsletter-campaign-kit-queue">
+			<label for="nck-queue-status"><?php esc_html_e( 'Delivery status', 'newsletter-campaign-kit' ); ?></label>
+			<select id="nck-queue-status" name="status">
+				<option value=""><?php esc_html_e( 'All statuses', 'newsletter-campaign-kit' ); ?></option>
+				<?php foreach ( $allowed_statuses as $option ) : ?><option value="<?php echo esc_attr( $option ); ?>" <?php selected( $status, $option ); ?>><?php echo esc_html( ucfirst( $option ) ); ?></option><?php endforeach; ?>
+			</select>
+			<button class="button button-primary" type="submit"><?php esc_html_e( 'Filter', 'newsletter-campaign-kit' ); ?></button>
+			<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=newsletter-campaign-kit-queue' ) ); ?>"><?php esc_html_e( 'Reset', 'newsletter-campaign-kit' ); ?></a>
+		</form>
+
+		<div class="nck-table-wrap"><table class="widefat fixed striped">
 			<thead><tr><th><?php esc_html_e( 'Campaign', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subscriber', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Attempts', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Next attempt', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Last error', 'newsletter-campaign-kit' ); ?></th></tr></thead>
 			<tbody>
 			<?php if ( empty( $items ) ) : ?><tr><td colspan="6"><?php esc_html_e( 'No queued delivery yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
@@ -423,7 +466,8 @@ function newsletter_campaign_kit_render_queue_page() {
 				</tr>
 			<?php endforeach; ?>
 			</tbody>
-		</table>
+		</table></div>
+		<?php newsletter_campaign_kit_render_pagination( $current_page, $total, $per_page, array( 'page' => 'newsletter-campaign-kit-queue', 'status' => $status ) ); ?>
 	</div>
 	<?php
 }

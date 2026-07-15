@@ -1,0 +1,139 @@
+.newsletter-campaign-kit-admin {
+	max-width: 1440px;
+}
+
+.newsletter-campaign-kit-admin .nck-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+	gap: 12px;
+	margin: 18px 0;
+}
+
+.newsletter-campaign-kit-admin .nck-card,
+.newsletter-campaign-kit-admin .nck-panel {
+	box-sizing: border-box;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	padding: 20px;
+}
+
+.newsletter-campaign-kit-admin .nck-card span {
+	display: block;
+	color: #646970;
+	font-size: 12px;
+	text-transform: uppercase;
+}
+
+.newsletter-campaign-kit-admin .nck-card strong {
+	display: block;
+	margin-top: 8px;
+	font-size: 28px;
+}
+
+.newsletter-campaign-kit-admin .nck-filters,
+.newsletter-campaign-kit-admin .nck-inline-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.newsletter-campaign-kit-admin .nck-filters {
+	margin: 18px 0;
+}
+
+.newsletter-campaign-kit-admin input[type="text"],
+.newsletter-campaign-kit-admin input[type="email"],
+.newsletter-campaign-kit-admin input[type="search"],
+.newsletter-campaign-kit-admin input[type="url"],
+.newsletter-campaign-kit-admin select,
+.newsletter-campaign-kit-admin textarea {
+	max-width: 100%;
+}
+
+.newsletter-campaign-kit-admin .large-text,
+.newsletter-campaign-kit-admin .nck-field-wide {
+	width: min(100%, 900px);
+}
+
+.newsletter-campaign-kit-admin .regular-text {
+	width: min(100%, 480px);
+}
+
+.newsletter-campaign-kit-admin .nck-table-wrap {
+	overflow-x: auto;
+	margin: 16px 0 0;
+}
+
+.newsletter-campaign-kit-admin .nck-table-wrap table {
+	min-width: 780px;
+}
+
+.newsletter-campaign-kit-admin .nck-pagination {
+	display: flex;
+	justify-content: flex-end;
+	margin: 18px 0 28px;
+}
+
+.newsletter-campaign-kit-admin .nck-pagination .page-numbers {
+	display: flex;
+	gap: 4px;
+	margin: 0;
+}
+
+.newsletter-campaign-kit-admin .nck-pagination a,
+.newsletter-campaign-kit-admin .nck-pagination span {
+	display: inline-flex;
+	min-height: 32px;
+	align-items: center;
+	padding: 0 10px;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	text-decoration: none;
+}
+
+.newsletter-campaign-kit-admin .nck-pagination .current {
+	border-color: #2271b1;
+	background: #2271b1;
+	color: #fff;
+}
+
+.newsletter-campaign-kit-admin .nck-audit-details summary {
+	cursor: pointer;
+	color: #2271b1;
+	font-weight: 600;
+}
+
+.newsletter-campaign-kit-admin .nck-audit-details dl {
+	display: grid;
+	grid-template-columns: minmax(100px, 160px) 1fr;
+	gap: 6px 12px;
+	min-width: 320px;
+	margin: 12px 0 0;
+}
+
+.newsletter-campaign-kit-admin .nck-audit-details dt {
+	font-weight: 600;
+}
+
+.newsletter-campaign-kit-admin .nck-audit-details dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 782px) {
+	.newsletter-campaign-kit-admin .nck-filters {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.newsletter-campaign-kit-admin .nck-filters > * {
+		width: 100%;
+	}
+
+	.newsletter-campaign-kit-admin .nck-pagination {
+		justify-content: flex-start;
+		overflow-x: auto;
+	}
+}

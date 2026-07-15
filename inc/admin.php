@@ -64,6 +64,21 @@ function newsletter_campaign_kit_register_admin_menu() {
 }
 add_action( 'admin_menu', 'newsletter_campaign_kit_register_admin_menu' );
 
+/** Load one consistent responsive stylesheet on Newsletter Kit screens. */
+function newsletter_campaign_kit_enqueue_admin_assets( $hook_suffix ) {
+	if ( false === strpos( (string) $hook_suffix, 'newsletter-campaign-kit' ) ) {
+		return;
+	}
+
+	wp_enqueue_style(
+		'newsletter-campaign-kit-admin',
+		NEWSLETTER_CAMPAIGN_KIT_URL . 'assets/css/admin.css',
+		array(),
+		NEWSLETTER_CAMPAIGN_KIT_VERSION
+	);
+}
+add_action( 'admin_enqueue_scripts', 'newsletter_campaign_kit_enqueue_admin_assets' );
+
 /**
  * Count subscribers by status.
  *
@@ -143,6 +158,55 @@ function newsletter_campaign_kit_get_subscribers( $args = array() ) {
 	return $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A );
 }
 
+/** Count subscribers matching the same safe filters as the admin query. */
+function newsletter_campaign_kit_count_subscribers( $args = array() ) {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_subscribers_table_exists() ) {
+		return 0;
+	}
+	$args   = wp_parse_args( $args, array( 'status' => '', 'search' => '' ) );
+	$where  = array( '1=1' );
+	$params = array();
+	$status = sanitize_key( $args['status'] );
+	if ( in_array( $status, array( 'subscribed', 'pending', 'unsubscribed', 'suppressed' ), true ) ) {
+		$where[]  = 'status = %s';
+		$params[] = $status;
+	}
+	$search = sanitize_text_field( $args['search'] );
+	if ( '' !== $search ) {
+		$where[]  = 'email LIKE %s';
+		$params[] = '%' . $wpdb->esc_like( $search ) . '%';
+	}
+	$sql = 'SELECT COUNT(*) FROM ' . newsletter_campaign_kit_get_subscribers_table() . ' WHERE ' . implode( ' AND ', $where );
+
+	return (int) ( $params ? $wpdb->get_var( $wpdb->prepare( $sql, $params ) ) : $wpdb->get_var( $sql ) );
+}
+
+/** Render accessible WordPress pagination while preserving active filters. */
+function newsletter_campaign_kit_render_pagination( $current_page, $total_items, $per_page, $base_args = array(), $page_key = 'paged' ) {
+	$total_pages = max( 1, (int) ceil( absint( $total_items ) / max( 1, absint( $per_page ) ) ) );
+	if ( $total_pages <= 1 ) {
+		return;
+	}
+	$base_args              = array_filter( $base_args, static function ( $value ) { return '' !== $value && null !== $value; } );
+	$base_args[ $page_key ] = '%#%';
+	$links                  = paginate_links(
+		array(
+			'base'      => add_query_arg( $base_args, admin_url( 'admin.php' ) ),
+			'format'    => '',
+			'current'   => max( 1, absint( $current_page ) ),
+			'total'     => $total_pages,
+			'type'      => 'list',
+			'prev_text' => __( 'Previous', 'newsletter-campaign-kit' ),
+			'next_text' => __( 'Next', 'newsletter-campaign-kit' ),
+		)
+	);
+	if ( $links ) {
+		echo '<nav class="nck-pagination" aria-label="' . esc_attr__( 'List pagination', 'newsletter-campaign-kit' ) . '">' . wp_kses_post( $links ) . '</nav>';
+	}
+}
+
 /**
  * Render a compact status card.
  *
@@ -168,12 +232,17 @@ function newsletter_campaign_kit_render_subscribers_page() {
 
 	$status      = isset( $_GET['status'] ) ? sanitize_key( wp_unslash( $_GET['status'] ) ) : '';
 	$search      = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
+	$current_page = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+	$per_page     = 25;
 	$subscribers = newsletter_campaign_kit_get_subscribers(
 		array(
 			'status' => $status,
 			'search' => $search,
+			'limit'  => $per_page,
+			'offset' => ( $current_page - 1 ) * $per_page,
 		)
 	);
+	$filtered_total = newsletter_campaign_kit_count_subscribers( array( 'status' => $status, 'search' => $search ) );
 	$counts      = newsletter_campaign_kit_get_subscriber_counts();
 	$suppressions = newsletter_campaign_kit_get_suppressions( 50 );
 	$export_url  = wp_nonce_url( admin_url( 'admin-post.php?action=newsletter_campaign_kit_export_subscribers' ), 'newsletter_campaign_kit_export_subscribers' );
@@ -212,7 +281,7 @@ function newsletter_campaign_kit_render_subscribers_page() {
 			<?php endif; ?>
 		</form>
 
-		<table class="widefat fixed striped">
+		<div class="nck-table-wrap"><table class="widefat fixed striped">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Email', 'newsletter-campaign-kit' ); ?></th>
@@ -239,11 +308,12 @@ function newsletter_campaign_kit_render_subscribers_page() {
 					<?php endforeach; ?>
 				<?php endif; ?>
 			</tbody>
-		</table>
+		</table></div>
+		<?php newsletter_campaign_kit_render_pagination( $current_page, $filtered_total, $per_page, array( 'page' => 'newsletter-campaign-kit', 'status' => $status, 's' => $search ) ); ?>
 
 		<h2><?php esc_html_e( 'Durable suppression registry', 'newsletter-campaign-kit' ); ?></h2>
 		<p><?php esc_html_e( 'Active entries block re-import and delivery even when the subscriber record is removed. Released entries never resubscribe a contact automatically.', 'newsletter-campaign-kit' ); ?></p>
-		<table class="widefat fixed striped">
+		<div class="nck-table-wrap"><table class="widefat fixed striped">
 			<thead><tr><th><?php esc_html_e( 'Contact', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Reason', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Source', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Updated', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Action', 'newsletter-campaign-kit' ); ?></th></tr></thead>
 			<tbody>
 			<?php if ( empty( $suppressions ) ) : ?><tr><td colspan="6"><?php esc_html_e( 'No suppression has been recorded.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
@@ -253,11 +323,8 @@ function newsletter_campaign_kit_render_subscribers_page() {
 				<td><?php if ( 'active' === $suppression['status'] ) : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="newsletter_campaign_kit_release_suppression"><input type="hidden" name="suppression_id" value="<?php echo esc_attr( $suppression['id'] ); ?>"><?php wp_nonce_field( 'newsletter_campaign_kit_release_suppression_' . absint( $suppression['id'] ) ); ?><button class="button button-small" type="submit"><?php esc_html_e( 'Release', 'newsletter-campaign-kit' ); ?></button></form><?php else : ?>-<?php endif; ?></td>
 			</tr><?php endforeach; ?>
 			</tbody>
-		</table>
+		</table></div>
 	</div>
-	<style>
-		.newsletter-campaign-kit-admin .nck-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}.newsletter-campaign-kit-admin .nck-card{background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:16px}.newsletter-campaign-kit-admin .nck-card span{display:block;color:#646970;font-size:12px;text-transform:uppercase;letter-spacing:.08em}.newsletter-campaign-kit-admin .nck-card strong{display:block;margin-top:8px;font-size:28px}.newsletter-campaign-kit-admin .nck-filters{display:flex;gap:8px;align-items:center;margin:18px 0}.newsletter-campaign-kit-admin .nck-inline-actions{display:flex;gap:6px;flex-wrap:wrap}@media(max-width:900px){.newsletter-campaign-kit-admin .nck-grid{grid-template-columns:1fr 1fr}.newsletter-campaign-kit-admin .nck-filters{align-items:stretch;flex-direction:column}}
-	</style>
 	<?php
 }
 

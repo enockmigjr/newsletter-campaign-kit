@@ -12,6 +12,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Supporter le one-click unsubscribe RFC 8058 par POST idempotent et en-tetes `List-Unsubscribe`.
 - Bloquer la reactivation publique des contacts explicitement `suppressed` et verifier leur statut avant chaque envoi.
 - Fournir une premiere UI admin pour consulter, filtrer, changer le statut et exporter les abonnes.
+- Paginer les abonnes et le journal cote SQL, avec tableaux responsives, filtres persistants et details d'audit nettoyes.
 - Exporter sans troncature les abonnes par lots, ainsi que les listes, tags, segments, thematiques et rapports de campagne, avec neutralisation des formules CSV.
 - Importer des abonnes par CSV avec mapping d'en-tetes, preview non mutative, rapport temporaire et application transactionnelle par ligne.
 - Refuser les doublons du fichier, audiences inconnues, suppressions actives et reactivations sans option et consentement explicites.

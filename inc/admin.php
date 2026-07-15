@@ -75,6 +75,7 @@ function newsletter_campaign_kit_get_subscriber_counts() {
 	$empty = array(
 		'total'        => 0,
 		'subscribed'   => 0,
+		'pending'      => 0,
 		'unsubscribed' => 0,
 		'suppressed'   => 0,
 	);
@@ -123,7 +124,7 @@ function newsletter_campaign_kit_get_subscribers( $args = array() ) {
 	$params     = array();
 
 	$status = sanitize_key( $args['status'] );
-	if ( in_array( $status, array( 'subscribed', 'unsubscribed', 'suppressed' ), true ) ) {
+	if ( in_array( $status, array( 'subscribed', 'pending', 'unsubscribed', 'suppressed' ), true ) ) {
 		$where[]  = 'status = %s';
 		$params[] = $status;
 	}
@@ -190,6 +191,7 @@ function newsletter_campaign_kit_render_subscribers_page() {
 		<div class="nck-grid">
 			<?php newsletter_campaign_kit_render_count_card( __( 'Total', 'newsletter-campaign-kit' ), $counts['total'] ); ?>
 			<?php newsletter_campaign_kit_render_count_card( __( 'Subscribed', 'newsletter-campaign-kit' ), $counts['subscribed'] ); ?>
+			<?php newsletter_campaign_kit_render_count_card( __( 'Pending confirmation', 'newsletter-campaign-kit' ), $counts['pending'] ); ?>
 			<?php newsletter_campaign_kit_render_count_card( __( 'Unsubscribed', 'newsletter-campaign-kit' ), $counts['unsubscribed'] ); ?>
 			<?php newsletter_campaign_kit_render_count_card( __( 'Suppressed', 'newsletter-campaign-kit' ), $counts['suppressed'] ); ?>
 		</div>
@@ -199,7 +201,7 @@ function newsletter_campaign_kit_render_subscribers_page() {
 			<input type="search" name="s" value="<?php echo esc_attr( $search ); ?>" placeholder="<?php esc_attr_e( 'Search by email', 'newsletter-campaign-kit' ); ?>">
 			<select name="status">
 				<option value=""><?php esc_html_e( 'All statuses', 'newsletter-campaign-kit' ); ?></option>
-				<?php foreach ( array( 'subscribed', 'unsubscribed', 'suppressed' ) as $option ) : ?>
+				<?php foreach ( array( 'subscribed', 'pending', 'unsubscribed', 'suppressed' ) as $option ) : ?>
 					<option value="<?php echo esc_attr( $option ); ?>" <?php selected( $status, $option ); ?>><?php echo esc_html( ucfirst( $option ) ); ?></option>
 				<?php endforeach; ?>
 			</select>

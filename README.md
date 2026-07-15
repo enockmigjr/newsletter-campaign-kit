@@ -5,6 +5,8 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 ## Responsabilites
 
 - Capturer les abonnements newsletter avec nonce et consentement.
+- Exiger par defaut un double opt-in public: statut pending, lien HMAC expirable, cooldown de renvoi et activation atomique single-use.
+- Limiter independamment les tentatives par empreinte reseau et par adresse, avec reponse publique neutre pour les contacts connus, pending ou suppressed.
 - Stocker l'email, un email hash, un token de desinscription, source, consentement, IP hash et user-agent tronque.
 - Permettre la desinscription publique par token opaque sans exposer l'email dans l'URL.
 - Supporter le one-click unsubscribe RFC 8058 par POST idempotent et en-tetes `List-Unsubscribe`.
@@ -78,12 +80,16 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 
 Le provider HTTP lit `NEWSLETTER_CAMPAIGN_KIT_HTTP_ENDPOINT`, `NEWSLETTER_CAMPAIGN_KIT_HTTP_API_KEY`, `NEWSLETTER_CAMPAIGN_KIT_WEBHOOK_SECRET` et, facultativement, `NEWSLETTER_CAMPAIGN_KIT_HTTP_TIMEOUT`. Ces valeurs doivent etre injectees par `wp-config.php`, l'environnement ou le filtre `newsletter_campaign_kit_http_provider_config`; elles ne sont jamais stockees dans les options.
 
+Les reglages publics bornent `double_opt_in_enabled`, la validite du lien (1-168 heures), le cooldown (1-1440 minutes), les tentatives (1-30) et leur fenetre (1-1440 minutes). Le token brut n'est present que dans l'email; la table abonnes conserve son HMAC, l'expiration, la date d'envoi et la date de confirmation.
+
 Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte un JSON `{ "id", "type", "email" }`, avec `type` egal a `bounce` ou `complaint`. Le provider signe exactement `timestamp.corps_brut` en HMAC-SHA256 dans `X-Newsletter-Signature` et fournit le timestamp Unix dans `X-Newsletter-Timestamp`.
 
 ## Actions admin-post
 
 - `admin_post_nopriv_newsletter_campaign_kit_subscribe`
 - `admin_post_newsletter_campaign_kit_subscribe`
+- `admin_post_nopriv_newsletter_campaign_kit_confirm_subscription`
+- `admin_post_newsletter_campaign_kit_confirm_subscription`
 - `admin_post_nopriv_newsletter_campaign_kit_unsubscribe`
 - `admin_post_newsletter_campaign_kit_unsubscribe`
 - `admin_post_nopriv_newsletter_campaign_kit_preferences`
@@ -142,6 +148,8 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 23. Executer `wp eval-file tests/runtime-import.php` pour verifier preview, mapping, doublons, suppressions, consentement, reactivation, affectations et transactions par ligne.
 24. Executer `wp eval-file tests/runtime-audience-snapshots.php` pour verifier immutabilite, idempotence, rollback, minimisation, cron et reporting admin.
 25. Executer `wp eval-file tests/runtime-http-provider.php` pour verifier transport 2xx, erreurs normalisees, configuration fail-closed, HMAC, expiration, rejeu et suppression automatique.
+26. Executer `wp eval-file tests/runtime-double-opt-in.php` pour verifier pending, HMAC, email multipart, cooldown, confirmation single-use, expiration, suppression et rate limits.
+27. Executer `wp eval-file tests/runtime-double-opt-in-http.php` pour verifier nonce, ecriture, reponse neutre, livraison Mailpit et activation par le vrai lien HTTP.
 
 ## Hooks publics
 
@@ -159,6 +167,7 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 - Bibliotheque de blocs editoriaux au-dela des templates complets.
 - Adaptateurs natifs propres aux fournisseurs (Brevo, Mailgun, Postmark, SES) au-dessus du contrat HTTP generique.
 - Validation en staging avec un domaine expediteur, DKIM et identifiants reels du fournisseur retenu.
+- Supervision des taux de confirmation, erreurs de remise et abus distribues lorsque l'hebergeur final est connu.
 - Tracking ouvertures/clics et exports de reporting avances.
 
 ## References officielles

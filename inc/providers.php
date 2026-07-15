@@ -16,6 +16,11 @@ function newsletter_campaign_kit_get_provider_defaults() {
 		'from_email'        => get_option( 'admin_email' ),
 		'one_click_enabled' => false,
 		'dkim_confirmed'    => false,
+		'double_opt_in_enabled'             => true,
+		'confirmation_ttl_hours'            => 24,
+		'confirmation_resend_minutes'       => 15,
+		'subscription_attempts_per_window'  => 5,
+		'subscription_window_minutes'       => 15,
 	);
 }
 
@@ -31,6 +36,11 @@ function newsletter_campaign_kit_get_provider_settings() {
 	$settings['from_email'] = sanitize_email( $settings['from_email'] );
 	$settings['one_click_enabled'] = ! empty( $settings['one_click_enabled'] );
 	$settings['dkim_confirmed']    = ! empty( $settings['dkim_confirmed'] );
+	$settings['double_opt_in_enabled']            = ! empty( $settings['double_opt_in_enabled'] );
+	$settings['confirmation_ttl_hours']           = max( 1, min( 168, absint( $settings['confirmation_ttl_hours'] ) ) );
+	$settings['confirmation_resend_minutes']      = max( 1, min( 1440, absint( $settings['confirmation_resend_minutes'] ) ) );
+	$settings['subscription_attempts_per_window'] = max( 1, min( 30, absint( $settings['subscription_attempts_per_window'] ) ) );
+	$settings['subscription_window_minutes']      = max( 1, min( 1440, absint( $settings['subscription_window_minutes'] ) ) );
 
 	return $settings;
 }
@@ -51,6 +61,11 @@ function newsletter_campaign_kit_save_provider_settings() {
 		'from_email'        => is_email( $from_email ) ? $from_email : get_option( 'admin_email' ),
 		'one_click_enabled' => ! empty( $_POST['one_click_enabled'] ),
 		'dkim_confirmed'    => ! empty( $_POST['dkim_confirmed'] ),
+		'double_opt_in_enabled'            => ! empty( $_POST['double_opt_in_enabled'] ),
+		'confirmation_ttl_hours'           => isset( $_POST['confirmation_ttl_hours'] ) ? max( 1, min( 168, absint( $_POST['confirmation_ttl_hours'] ) ) ) : 24,
+		'confirmation_resend_minutes'      => isset( $_POST['confirmation_resend_minutes'] ) ? max( 1, min( 1440, absint( $_POST['confirmation_resend_minutes'] ) ) ) : 15,
+		'subscription_attempts_per_window' => isset( $_POST['subscription_attempts_per_window'] ) ? max( 1, min( 30, absint( $_POST['subscription_attempts_per_window'] ) ) ) : 5,
+		'subscription_window_minutes'      => isset( $_POST['subscription_window_minutes'] ) ? max( 1, min( 1440, absint( $_POST['subscription_window_minutes'] ) ) ) : 15,
 	);
 
 	update_option( 'newsletter_campaign_kit_provider_settings', $settings, false );
@@ -110,6 +125,16 @@ function newsletter_campaign_kit_render_settings_page() {
 						<strong><?php echo esc_html( ! empty( $http_status['delivery_ready'] ) ? __( 'Delivery configured', 'newsletter-campaign-kit' ) : __( 'Delivery not configured', 'newsletter-campaign-kit' ) ); ?></strong><br>
 						<span><?php echo esc_html( ! empty( $http_status['webhook_ready'] ) ? __( 'Signed provider webhook configured.', 'newsletter-campaign-kit' ) : __( 'Signed provider webhook not configured.', 'newsletter-campaign-kit' ) ); ?></span>
 						<p class="description"><?php esc_html_e( 'Define the endpoint, API key and webhook secret outside the database. Secret values are never displayed.', 'newsletter-campaign-kit' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Public subscription confirmation', 'newsletter-campaign-kit' ); ?></th>
+					<td>
+						<label><input type="checkbox" name="double_opt_in_enabled" value="1" <?php checked( $settings['double_opt_in_enabled'] ); ?>> <?php esc_html_e( 'Require email confirmation before a public subscriber becomes eligible', 'newsletter-campaign-kit' ); ?></label>
+						<p><label><?php esc_html_e( 'Link validity (hours)', 'newsletter-campaign-kit' ); ?> <input class="small-text" type="number" min="1" max="168" name="confirmation_ttl_hours" value="<?php echo esc_attr( $settings['confirmation_ttl_hours'] ); ?>"></label></p>
+						<p><label><?php esc_html_e( 'Resend cooldown (minutes)', 'newsletter-campaign-kit' ); ?> <input class="small-text" type="number" min="1" max="1440" name="confirmation_resend_minutes" value="<?php echo esc_attr( $settings['confirmation_resend_minutes'] ); ?>"></label></p>
+						<p><label><?php esc_html_e( 'Attempts per window', 'newsletter-campaign-kit' ); ?> <input class="small-text" type="number" min="1" max="30" name="subscription_attempts_per_window" value="<?php echo esc_attr( $settings['subscription_attempts_per_window'] ); ?>"></label> <label><?php esc_html_e( 'Window (minutes)', 'newsletter-campaign-kit' ); ?> <input class="small-text" type="number" min="1" max="1440" name="subscription_window_minutes" value="<?php echo esc_attr( $settings['subscription_window_minutes'] ); ?>"></label></p>
+						<p class="description"><?php esc_html_e( 'The public response stays neutral for existing, pending and suppressed addresses.', 'newsletter-campaign-kit' ); ?></p>
 					</td>
 				</tr>
 				<tr>

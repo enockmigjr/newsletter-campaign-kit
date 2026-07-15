@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.10.0
+ * Version: 0.11.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.10.0' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.11.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -157,6 +157,10 @@ function newsletter_campaign_kit_activate() {
 		email varchar(190) NOT NULL,
 		unsubscribe_token char(64) NOT NULL,
 		status varchar(24) NOT NULL DEFAULT 'subscribed',
+		confirmation_token_hash char(64) NULL,
+		confirmation_expires_at datetime NULL,
+		confirmation_sent_at datetime NULL,
+		confirmed_at datetime NULL,
 		source varchar(100) NOT NULL DEFAULT 'front_footer',
 		consent_text text NULL,
 		ip_hash char(64) NULL,
@@ -167,6 +171,8 @@ function newsletter_campaign_kit_activate() {
 		UNIQUE KEY email_hash (email_hash),
 		KEY unsubscribe_token (unsubscribe_token),
 		KEY status (status),
+		UNIQUE KEY confirmation_token_hash (confirmation_token_hash),
+		KEY confirmation_expires_at (confirmation_expires_at),
 		KEY updated_at (updated_at)
 	) {$charset_collate};";
 
@@ -476,6 +482,7 @@ require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/templates.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/campaigns.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/http-provider.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/providers.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/double-opt-in.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/queue.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/scheduler.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/reports.php';

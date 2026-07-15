@@ -227,6 +227,10 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 		'email'             => $email,
 		'unsubscribe_token' => $unsubscribe_token,
 		'status'            => 'subscribed',
+		'confirmation_token_hash' => null,
+		'confirmation_expires_at' => null,
+		'confirmation_sent_at'    => null,
+		'confirmed_at'             => $now,
 		'source'            => sanitize_key( $source ),
 		'consent_text'      => sanitize_textarea_field( $consent_text ),
 		'ip_hash'           => newsletter_campaign_kit_get_request_ip_hash(),
@@ -239,7 +243,7 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 			$table_name,
 			$data,
 			array( 'id' => (int) $existing['id'] ),
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ),
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
 
@@ -265,7 +269,7 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 	$inserted = $wpdb->insert(
 		$table_name,
 		$data,
-		array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+		array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 	);
 
 	if ( false === $inserted ) {
@@ -300,7 +304,13 @@ function newsletter_campaign_kit_handle_subscribe() {
 	$email        = isset( $_POST['newsletter_email'] ) ? sanitize_email( wp_unslash( $_POST['newsletter_email'] ) ) : '';
 	$source       = isset( $_POST['newsletter_source'] ) ? sanitize_key( wp_unslash( $_POST['newsletter_source'] ) ) : 'front_footer';
 	$consent_text = apply_filters( 'newsletter_campaign_kit_consent_text', __( 'I agree to receive editorial updates.', 'newsletter-campaign-kit' ), $source );
-	$result       = newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text );
+	$settings     = newsletter_campaign_kit_get_provider_settings();
+	$rate_limited = function_exists( 'newsletter_campaign_kit_public_subscription_rate_limit' ) && ! newsletter_campaign_kit_public_subscription_rate_limit( $email, $settings );
+	$result       = $rate_limited
+		? new WP_Error( 'subscription_rate_limited', __( 'The subscription request could not be processed.', 'newsletter-campaign-kit' ) )
+		: ( ! empty( $settings['double_opt_in_enabled'] ) && function_exists( 'newsletter_campaign_kit_request_subscription_confirmation' )
+			? newsletter_campaign_kit_request_subscription_confirmation( $email, $source, $consent_text, $settings )
+			: newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text ) );
 
 	if ( is_wp_error( $result ) ) {
 		$error_code = $result->get_error_code();
@@ -308,12 +318,12 @@ function newsletter_campaign_kit_handle_subscribe() {
 			newsletter_campaign_kit_log_event( 'newsletter_subscribe_rejected', 'warning', 0, array( 'reason' => $error_code, 'source' => $source ) );
 		}
 		// Do not expose suppression-list membership through the public response.
-		$public_status = 'email_suppressed' === $error_code ? 'subscribed' : $error_code;
+		$public_status = in_array( $error_code, array( 'email_suppressed', 'subscription_rate_limited' ), true ) ? 'confirmation_required' : $error_code;
 		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( $public_status ) );
 		exit;
 	}
 
-	wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( 'subscribed' ) );
+	wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( ! empty( $settings['double_opt_in_enabled'] ) ? 'confirmation_required' : 'subscribed' ) );
 	exit;
 }
 add_action( 'admin_post_nopriv_newsletter_campaign_kit_subscribe', 'newsletter_campaign_kit_handle_subscribe' );

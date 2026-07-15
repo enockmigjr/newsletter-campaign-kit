@@ -178,6 +178,18 @@ function newsletter_campaign_kit_set_subscriber_status( $subscriber_id, $status,
 		$data['unsubscribe_token'] = newsletter_campaign_kit_create_unsubscribe_token( $subscriber['email_hash'] );
 		$types[]                   = '%s';
 	}
+	if ( 'pending' !== $status ) {
+		$data['confirmation_token_hash'] = null;
+		$data['confirmation_expires_at'] = null;
+		$data['confirmation_sent_at']    = null;
+		$types[]                         = '%s';
+		$types[]                         = '%s';
+		$types[]                         = '%s';
+	}
+	if ( 'subscribed' === $status ) {
+		$data['confirmed_at'] = $now;
+		$types[]               = '%s';
+	}
 	$updated = $wpdb->update( $table, $data, array( 'id' => $subscriber_id ), $types, array( '%d' ) );
 	if ( false === $updated ) {
 		return new WP_Error( 'newsletter_status_db_error', __( 'The subscriber status could not be saved.', 'newsletter-campaign-kit' ) );

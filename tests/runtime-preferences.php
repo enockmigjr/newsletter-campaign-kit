@@ -68,6 +68,9 @@ try {
 	newsletter_preferences_runtime_assert( true === $result, 'Initial preference-test subscription failed.' );
 	$subscriber = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$subscribers_table} WHERE email_hash = %s", $email_hash ), ARRAY_A );
 	$subscriber_ids[] = (int) $subscriber['id'];
+	$owned_subscription = newsletter_campaign_kit_get_subscriber_by_email( $email );
+	newsletter_preferences_runtime_assert( is_array( $owned_subscription ) && (int) $subscriber['id'] === (int) $owned_subscription['id'], 'The internal owner subscription lookup did not resolve the expected subscriber.' );
+	newsletter_preferences_runtime_assert( null === newsletter_campaign_kit_get_subscriber_by_email( 'invalid-email' ), 'The internal owner subscription lookup accepted an invalid email.' );
 	newsletter_preferences_runtime_assert( newsletter_campaign_kit_assign_subscriber_to_list( $subscriber['id'], $list_id ), 'The runtime subscriber could not be assigned to its isolated list.' );
 	newsletter_preferences_runtime_assert( count( newsletter_campaign_kit_get_subscriber_topic_preferences( $subscriber['id'] ) ) >= 2, 'Active topics were not exposed by the preference service.' );
 

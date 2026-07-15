@@ -49,6 +49,24 @@ function newsletter_campaign_kit_create_unsubscribe_token( $email_hash ) {
 	return hash_hmac( 'sha256', sanitize_text_field( $email_hash ) . '|' . $entropy, wp_salt( 'secure_auth' ) );
 }
 
+/** Return a subscription owned by an email without exposing a public lookup endpoint. */
+function newsletter_campaign_kit_get_subscriber_by_email( $email ) {
+	global $wpdb;
+
+	$email = sanitize_email( $email );
+	if ( ! is_email( $email ) || ! newsletter_campaign_kit_subscribers_table_exists() ) {
+		return null;
+	}
+
+	return $wpdb->get_row(
+		$wpdb->prepare(
+			'SELECT id, email, status, source, unsubscribe_token, created_at, updated_at FROM ' . newsletter_campaign_kit_get_subscribers_table() . ' WHERE email_hash = %s LIMIT 1',
+			newsletter_campaign_kit_hash_email( $email )
+		),
+		ARRAY_A
+	);
+}
+
 /**
  * Check the shape of an unsubscribe capability token.
  *

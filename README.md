@@ -31,6 +31,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Afficher un reporting de livraison par campagne depuis la queue.
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
 - Integrer les exports, effacements et le guide de confidentialite natifs de WordPress.
+- Exposer aux integrations serveur l'abonnement correspondant a l'e-mail du compte, sans endpoint public de recherche.
 
 ## Capabilities
 
@@ -123,6 +124,7 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 19. Executer `wp eval-file tests/runtime-preferences.php` pour verifier GET non mutatif, CSRF, preferences thematiques, fail-closed provider, suppression durable et outils Privacy.
 20. Executer `wp eval-file tests/runtime-templates.php` pour verifier migration, sanitization, cycle de vie, interface admin, heritage campagne et `AltBody` remis a PHPMailer.
 21. Executer `wp eval-file tests/runtime-lifecycle.php` pour verifier edition/verrouillage/duplication des campagnes, lifecycle des segments, volumes d'audience et garde d'archivage.
+22. Verifier dans `runtime-preferences.php` que la lecture interne d'un abonnement est bornee a un e-mail valide.
 
 ## Hooks publics
 

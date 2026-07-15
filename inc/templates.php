@@ -315,13 +315,16 @@ function newsletter_campaign_kit_handle_preview() {
 
 	$kind = isset( $_GET['kind'] ) ? sanitize_key( wp_unslash( $_GET['kind'] ) ) : '';
 	$id   = isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0;
-	if ( ! in_array( $kind, array( 'template', 'campaign' ), true ) || ! $id ) {
+	if ( ! in_array( $kind, array( 'template', 'campaign', 'block' ), true ) || ! $id ) {
 		wp_die( esc_html__( 'Preview request is invalid.', 'newsletter-campaign-kit' ), '', array( 'response' => 400 ) );
 	}
 	check_admin_referer( 'newsletter_campaign_kit_preview_' . $kind . '_' . $id );
 	if ( 'template' === $kind ) {
 		$record = newsletter_campaign_kit_get_template( $id );
 		$content = $record ? array( 'subject' => $record['subject'], 'preview_text' => $record['preview_text'], 'html_body' => $record['html_body'], 'text_body' => $record['text_body'] ) : null;
+	} elseif ( 'block' === $kind ) {
+		$record = function_exists( 'newsletter_campaign_kit_get_block' ) ? newsletter_campaign_kit_get_block( $id ) : null;
+		$content = $record ? array( 'subject' => $record['name'], 'preview_text' => $record['category'], 'html_body' => $record['html_body'], 'text_body' => $record['text_body'] ) : null;
 	} else {
 		$record = function_exists( 'newsletter_campaign_kit_get_campaign' ) ? newsletter_campaign_kit_get_campaign( $id ) : null;
 		$content = $record ? array( 'subject' => $record['subject'], 'preview_text' => $record['preview_text'], 'html_body' => $record['body'], 'text_body' => $record['text_body'] ?? '' ) : null;

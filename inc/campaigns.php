@@ -702,6 +702,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	$segments  = function_exists( 'newsletter_campaign_kit_get_segments' ) ? newsletter_campaign_kit_get_segments() : array();
 	$topics    = function_exists( 'newsletter_campaign_kit_get_topics' ) ? newsletter_campaign_kit_get_topics() : array();
 	$templates = function_exists( 'newsletter_campaign_kit_get_templates' ) ? newsletter_campaign_kit_get_templates() : array();
+	$blocks    = function_exists( 'newsletter_campaign_kit_get_blocks' ) ? newsletter_campaign_kit_get_blocks() : array();
 	$statuses  = newsletter_campaign_kit_get_campaign_statuses();
 	$edit_id   = isset( $_GET['edit'] ) ? absint( $_GET['edit'] ) : 0;
 	$editing   = $edit_id ? newsletter_campaign_kit_get_campaign( $edit_id ) : null;
@@ -723,6 +724,17 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	}
 	foreach ( $topics as $topic ) {
 		$topic_labels[ (int) $topic['id'] ] = $topic['name'];
+	}
+	if ( $blocks ) {
+		$block_payload = array();
+		foreach ( $blocks as $block ) {
+			$block_payload[ (string) absint( $block['id'] ) ] = array(
+				'html' => $block['html_body'],
+				'text' => $block['text_body'],
+			);
+		}
+		wp_enqueue_script( 'newsletter-campaign-kit-blocks', NEWSLETTER_CAMPAIGN_KIT_URL . 'assets/js/campaign-blocks.js', array(), NEWSLETTER_CAMPAIGN_KIT_VERSION, true );
+		wp_localize_script( 'newsletter-campaign-kit-blocks', 'NewsletterCampaignBlocks', array( 'blocks' => $block_payload ) );
 	}
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
@@ -764,8 +776,15 @@ function newsletter_campaign_kit_render_campaigns_page() {
 						<?php endforeach; ?>
 					</select>
 				</p>
-				<p><textarea class="large-text" name="campaign_body" rows="8" placeholder="<?php esc_attr_e( 'Editorial body. Basic safe HTML is allowed.', 'newsletter-campaign-kit' ); ?>"><?php echo esc_textarea( $editing ? $editing['body'] : '' ); ?></textarea></p>
-				<p><textarea class="large-text code" name="campaign_text_body" rows="6" placeholder="<?php esc_attr_e( 'Plain-text version. Generated from HTML when left empty.', 'newsletter-campaign-kit' ); ?>"><?php echo esc_textarea( $editing ? $editing['text_body'] : '' ); ?></textarea></p>
+				<?php if ( $blocks ) : ?>
+					<div class="nck-block-inserter">
+						<label for="nck-editorial-block"><?php esc_html_e( 'Editorial block', 'newsletter-campaign-kit' ); ?></label>
+						<select id="nck-editorial-block"><option value=""><?php esc_html_e( 'Choose a reusable block', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $blocks as $block ) : ?><option value="<?php echo esc_attr( $block['id'] ); ?>"><?php echo esc_html( $block['name'] ); ?></option><?php endforeach; ?></select>
+						<button class="button" type="button" data-newsletter-insert-block><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span> <?php esc_html_e( 'Insert block', 'newsletter-campaign-kit' ); ?></button>
+					</div>
+				<?php endif; ?>
+				<p><textarea id="nck-campaign-html-body" class="large-text" name="campaign_body" rows="8" placeholder="<?php esc_attr_e( 'Editorial body. Basic safe HTML is allowed.', 'newsletter-campaign-kit' ); ?>"><?php echo esc_textarea( $editing ? $editing['body'] : '' ); ?></textarea></p>
+				<p><textarea id="nck-campaign-text-body" class="large-text code" name="campaign_text_body" rows="6" placeholder="<?php esc_attr_e( 'Plain-text version. Generated from HTML when left empty.', 'newsletter-campaign-kit' ); ?>"><?php echo esc_textarea( $editing ? $editing['text_body'] : '' ); ?></textarea></p>
 				<?php submit_button( $editing ? __( 'Save draft', 'newsletter-campaign-kit' ) : __( 'Create draft', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 				<?php if ( $editing ) : ?><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns' ) ); ?>"><?php esc_html_e( 'Cancel editing', 'newsletter-campaign-kit' ); ?></a><?php endif; ?>
 			</form>
@@ -801,6 +820,6 @@ function newsletter_campaign_kit_render_campaigns_page() {
 			</tbody>
 		</table>
 	</div>
-	<style>.newsletter-campaign-kit-admin .nck-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;margin:18px 0;padding:16px}.newsletter-campaign-kit-admin .nck-inline-actions{display:flex;gap:6px;flex-wrap:wrap}</style>
+	<style>.newsletter-campaign-kit-admin .nck-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;margin:18px 0;padding:16px}.newsletter-campaign-kit-admin .nck-inline-actions,.newsletter-campaign-kit-admin .nck-block-inserter{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.newsletter-campaign-kit-admin .nck-block-inserter{margin:16px 0}.newsletter-campaign-kit-admin .nck-block-inserter .dashicons{vertical-align:text-bottom}</style>
 	<?php
 }

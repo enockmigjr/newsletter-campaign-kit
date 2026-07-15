@@ -27,6 +27,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Modifier uniquement les brouillons et dupliquer toute campagne vers un nouveau brouillon sans etat de livraison ni file d'envoi.
 - Modifier, dupliquer, archiver et restaurer les segments avec estimation exacte de leur audience et verrou d'archivage lorsqu'une campagne non terminale les utilise.
 - Creer, modifier, dupliquer, archiver et restaurer des templates editoriaux reutilisables.
+- Creer, modifier, dupliquer, archiver et restaurer des blocs editoriaux categorises, puis les inserer a la position du curseur dans les versions HTML et texte d'une campagne.
 - Heriter d'un template dans une campagne tout en autorisant des surcharges explicites.
 - Previsualiser les versions HTML et texte dans une page admin isolee par capability, nonce et CSP.
 - Envoyer des emails `multipart/alternative` avec `AltBody` texte via le hook PHPMailer borne a l'appel `wp_mail`.
@@ -71,6 +72,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `{$wpdb->prefix}newsletter_campaign_audit`
 - `{$wpdb->prefix}newsletter_campaign_campaigns`
 - `{$wpdb->prefix}newsletter_campaign_templates`
+- `{$wpdb->prefix}newsletter_campaign_blocks`
 - `{$wpdb->prefix}newsletter_campaign_queue`
 - `{$wpdb->prefix}newsletter_campaign_audience_snapshots`
 - `{$wpdb->prefix}newsletter_campaign_audience_snapshot_members`
@@ -126,6 +128,8 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 - `admin_post_newsletter_campaign_kit_duplicate_campaign`
 - `admin_post_newsletter_campaign_kit_save_template`
 - `admin_post_newsletter_campaign_kit_template_action`
+- `admin_post_newsletter_campaign_kit_save_block`
+- `admin_post_newsletter_campaign_kit_block_action`
 - `admin_post_newsletter_campaign_kit_preview`
 - `admin_post_newsletter_campaign_kit_transition_campaign`
 - `admin_post_newsletter_campaign_kit_schedule_campaign`
@@ -163,6 +167,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 27. Executer `wp eval-file tests/runtime-double-opt-in-http.php` pour verifier nonce, ecriture, reponse neutre, livraison Mailpit et activation par le vrai lien HTTP.
 28. Executer `wp eval-file tests/runtime-scheduler-operations.php` pour verifier retention pending, verrous, batch configure, exceptions provider et cinq etats de sante cron.
 29. Executer `wp eval-file tests/runtime-campaign-confirmation.php` pour verifier titre exact, preuve d'audience obsolete, atomicite de l'envoi, reprise apres pause, audience programmee figee et ecran de revue admin.
+30. Executer `wp eval-file tests/runtime-editorial-blocks.php` puis `node tests/campaign-blocks.js` pour verifier migration, sanitization, lifecycle, capability et insertion HTML/texte au curseur.
 
 ## Hooks publics
 
@@ -170,6 +175,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 - `newsletter_campaign_kit_suppression_reasons`: etend les motifs acceptes par les providers de bounce/complaint.
 - `newsletter_campaign_kit_send_email`: branche un provider externe sans stocker ses secrets dans le plugin.
 - `newsletter_campaign_kit_http_provider_config`: injecte endpoint, cle API, secret webhook et timeout depuis la configuration serveur.
+- `newsletter_campaign_kit_block_categories`: etend les categories bornees de la bibliotheque de blocs.
 - `wp_privacy_personal_data_exporters` et `wp_privacy_personal_data_erasers`: exportent ou effacent les donnees identifiantes de l'abonne.
 
 La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppression active doit continuer a bloquer les remises. Le registre ne contient pas l'adresse brute. Les preuves de provider conservent une cle d'evenement opaque et sont dissociees de l'abonne efface. La levee d'une suppression place un contact encore present en statut `unsubscribed`; elle ne constitue jamais un consentement.
@@ -177,7 +183,6 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 ## Reste majeur
 
 - Export avance des listes, tags et segments (l'import CSV des abonnes et de leurs affectations est operationnel).
-- Bibliotheque de blocs editoriaux au-dela des templates complets.
 - Adaptateurs natifs propres aux fournisseurs (Brevo, Mailgun, Postmark, SES) au-dessus du contrat HTTP generique.
 - Validation en staging avec un domaine expediteur, DKIM et identifiants reels du fournisseur retenu.
 - Alertes externes, metriques provider et supervision distribuee des confirmations/abus lorsque l'hebergeur final est connu.

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.7.1
+ * Version: 0.8.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.7.1' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.8.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -395,6 +395,8 @@ add_action( 'init', 'newsletter_campaign_kit_maybe_upgrade' );
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/suppressions.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/subscribers.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segments.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/import.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/import-admin.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segment-engine.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/preferences.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';

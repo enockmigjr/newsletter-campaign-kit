@@ -10,6 +10,8 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Supporter le one-click unsubscribe RFC 8058 par POST idempotent et en-tetes `List-Unsubscribe`.
 - Bloquer la reactivation publique des contacts explicitement `suppressed` et verifier leur statut avant chaque envoi.
 - Fournir une premiere UI admin pour consulter, filtrer, changer le statut et exporter les abonnes.
+- Importer des abonnes par CSV avec mapping d'en-tetes, preview non mutative, rapport temporaire et application transactionnelle par ligne.
+- Refuser les doublons du fichier, audiences inconnues, suppressions actives et reactivations sans option et consentement explicites.
 - Creer des listes et tags de segmentation avec liaisons abonnes/listes/tags.
 - Affecter ou retirer des abonnes aux listes et tags depuis l'administration.
 - Construire des segments dynamiques `all`/`any` selon listes, tags, source et date d'inscription.
@@ -82,6 +84,7 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 - `admin_post_newsletter_campaign_kit_update_subscriber_status`
 - `admin_post_newsletter_campaign_kit_release_suppression`
 - `admin_post_newsletter_campaign_kit_export_subscribers`
+- `admin_post_newsletter_campaign_kit_import_csv`
 - `admin_post_newsletter_campaign_kit_create_list`
 - `admin_post_newsletter_campaign_kit_create_tag`
 - `admin_post_newsletter_campaign_kit_create_segment`
@@ -125,6 +128,7 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 20. Executer `wp eval-file tests/runtime-templates.php` pour verifier migration, sanitization, cycle de vie, interface admin, heritage campagne et `AltBody` remis a PHPMailer.
 21. Executer `wp eval-file tests/runtime-lifecycle.php` pour verifier edition/verrouillage/duplication des campagnes, lifecycle des segments, volumes d'audience et garde d'archivage.
 22. Verifier dans `runtime-preferences.php` que la lecture interne d'un abonnement est bornee a un e-mail valide.
+23. Executer `wp eval-file tests/runtime-import.php` pour verifier preview, mapping, doublons, suppressions, consentement, reactivation, affectations et transactions par ligne.
 
 ## Hooks publics
 
@@ -137,7 +141,7 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 
 ## Reste majeur
 
-- Imports/exports avances de listes, tags et segments.
+- Export avance des listes, tags et segments (l'import CSV des abonnes et de leurs affectations est operationnel).
 - Snapshots d'audience immuables permettant d'expliquer le ciblage apres envoi.
 - Bibliotheque de blocs editoriaux au-dela des templates complets.
 - Provider API externe avance avec secrets hors Git.

@@ -323,7 +323,23 @@ function newsletter_campaign_kit_handle_transition_campaign() {
 		$types[]         = '%s';
 	}
 
+	$delivery_transaction = 'sending' === $next_status;
+	if ( $delivery_transaction ) {
+		$wpdb->query( 'START TRANSACTION' );
+		$enqueue_result = newsletter_campaign_kit_enqueue_campaign( $campaign_id, false );
+		if ( is_wp_error( $enqueue_result ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+				newsletter_campaign_kit_log_event( 'newsletter_campaign_transition_failed', 'failure', 0, array( 'campaign_id' => $campaign_id, 'from_status' => $campaign['status'], 'to_status' => $next_status, 'reason' => $enqueue_result->get_error_code() ) );
+			}
+			wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns&transition=failed' ) );
+			exit;
+		}
+	}
 	$updated = $wpdb->update( $table, $data, array( 'id' => $campaign_id ), $types, array( '%d' ) );
+	if ( $delivery_transaction ) {
+		$wpdb->query( false === $updated ? 'ROLLBACK' : 'COMMIT' );
+	}
 
 	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
 		newsletter_campaign_kit_log_event(
@@ -338,7 +354,7 @@ function newsletter_campaign_kit_handle_transition_campaign() {
 		);
 	}
 
-	if ( false !== $updated && function_exists( 'newsletter_campaign_kit_sync_queue_for_campaign_transition' ) ) {
+	if ( false !== $updated && 'sending' !== $next_status && function_exists( 'newsletter_campaign_kit_sync_queue_for_campaign_transition' ) ) {
 		newsletter_campaign_kit_sync_queue_for_campaign_transition( $campaign_id, $next_status );
 	}
 

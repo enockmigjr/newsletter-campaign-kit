@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.8.0
+ * Version: 0.9.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.8.0' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.9.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -63,6 +63,18 @@ function newsletter_campaign_kit_get_lists_table() {
 	global $wpdb;
 
 	return $wpdb->prefix . 'newsletter_campaign_lists';
+}
+
+function newsletter_campaign_kit_get_audience_snapshots_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_audience_snapshots';
+}
+
+function newsletter_campaign_kit_get_audience_snapshot_members_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_audience_snapshot_members';
 }
 
 function newsletter_campaign_kit_get_tags_table() {
@@ -246,6 +258,41 @@ function newsletter_campaign_kit_activate() {
 	) {$charset_collate};";
 
 	dbDelta( $queue_sql );
+	$snapshots_table = newsletter_campaign_kit_get_audience_snapshots_table();
+	$snapshots_sql   = "CREATE TABLE {$snapshots_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		campaign_id bigint(20) unsigned NOT NULL,
+		audience_type varchar(16) NOT NULL DEFAULT 'all',
+		audience_id bigint(20) unsigned NULL,
+		audience_label varchar(190) NOT NULL,
+		topic_id bigint(20) unsigned NULL,
+		topic_label varchar(190) NULL,
+		rules longtext NULL,
+		recipient_count bigint(20) unsigned NOT NULL DEFAULT 0,
+		created_by bigint(20) unsigned NULL,
+		created_at datetime NOT NULL,
+		PRIMARY KEY  (id),
+		UNIQUE KEY campaign_id (campaign_id),
+		KEY audience (audience_type, audience_id),
+		KEY topic_id (topic_id),
+		KEY created_at (created_at)
+	) {$charset_collate};";
+
+	dbDelta( $snapshots_sql );
+	$snapshot_members_table = newsletter_campaign_kit_get_audience_snapshot_members_table();
+	$snapshot_members_sql   = "CREATE TABLE {$snapshot_members_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		snapshot_id bigint(20) unsigned NOT NULL,
+		subscriber_id bigint(20) unsigned NULL,
+		member_key char(64) NOT NULL,
+		created_at datetime NOT NULL,
+		PRIMARY KEY  (id),
+		UNIQUE KEY snapshot_member (snapshot_id, member_key),
+		KEY snapshot_id (snapshot_id),
+		KEY subscriber_id (subscriber_id)
+	) {$charset_collate};";
+
+	dbDelta( $snapshot_members_sql );
 
 	$lists_table            = newsletter_campaign_kit_get_lists_table();
 	$tags_table             = newsletter_campaign_kit_get_tags_table();
@@ -400,6 +447,7 @@ require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/import-admin.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segment-engine.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/preferences.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audience-snapshots.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/templates.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/campaigns.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/providers.php';

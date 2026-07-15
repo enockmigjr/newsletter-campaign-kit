@@ -18,9 +18,16 @@ function newsletter_campaign_kit_get_campaign_reports( $limit = 50 ) {
 
 	$campaigns_table = newsletter_campaign_kit_get_campaigns_table();
 	$queue_table     = newsletter_campaign_kit_get_queue_table();
+	$snapshots_table = newsletter_campaign_kit_get_audience_snapshots_table();
+	$has_snapshots   = newsletter_campaign_kit_audience_snapshot_tables_exist();
 	$limit           = max( 1, min( 100, absint( $limit ) ) );
+	$snapshot_select = $has_snapshots
+		? 'sn.id AS snapshot_id, sn.audience_type, sn.audience_label, sn.topic_label, sn.rules AS snapshot_rules, sn.recipient_count AS snapshot_recipient_count, sn.created_at AS snapshot_created_at'
+		: "NULL AS snapshot_id, NULL AS audience_type, NULL AS audience_label, NULL AS topic_label, NULL AS snapshot_rules, 0 AS snapshot_recipient_count, NULL AS snapshot_created_at";
+	$snapshot_join = $has_snapshots ? "LEFT JOIN {$snapshots_table} sn ON sn.campaign_id = c.id" : '';
 
 	$sql = "SELECT c.id, c.title, c.subject, c.status, c.updated_at,
+		{$snapshot_select},
 		COUNT(q.id) AS queued_total,
 		SUM(CASE WHEN q.status = 'sent' THEN 1 ELSE 0 END) AS sent_total,
 		SUM(CASE WHEN q.status = 'failed' THEN 1 ELSE 0 END) AS failed_total,
@@ -31,6 +38,7 @@ function newsletter_campaign_kit_get_campaign_reports( $limit = 50 ) {
 		MAX(q.sent_at) AS last_sent_at
 		FROM {$campaigns_table} c
 		LEFT JOIN {$queue_table} q ON q.campaign_id = c.id
+		{$snapshot_join}
 		GROUP BY c.id
 		ORDER BY c.updated_at DESC
 		LIMIT %d";
@@ -45,6 +53,7 @@ function newsletter_campaign_kit_get_campaign_reports( $limit = 50 ) {
 		$row['processing_total'] = absint( $row['processing_total'] );
 		$row['paused_total']     = absint( $row['paused_total'] );
 		$row['cancelled_total']  = absint( $row['cancelled_total'] );
+		$row['snapshot_recipient_count'] = absint( $row['snapshot_recipient_count'] );
 		$row['delivery_rate']    = $row['queued_total'] > 0 ? round( ( $row['sent_total'] / $row['queued_total'] ) * 100, 1 ) : 0;
 	}
 	unset( $row );
@@ -104,13 +113,21 @@ function newsletter_campaign_kit_render_reports_page() {
 		</div>
 
 		<table class="widefat fixed striped">
-			<thead><tr><th><?php esc_html_e( 'Campaign', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Queued', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Sent', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Failed', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Pending', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Delivery', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Last sent', 'newsletter-campaign-kit' ); ?></th></tr></thead>
+			<thead><tr><th><?php esc_html_e( 'Campaign', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Audience snapshot', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Queued', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Sent', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Failed', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Pending', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Delivery', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Last sent', 'newsletter-campaign-kit' ); ?></th></tr></thead>
 			<tbody>
-			<?php if ( empty( $reports ) ) : ?><tr><td colspan="8"><?php esc_html_e( 'No campaign report yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
+			<?php if ( empty( $reports ) ) : ?><tr><td colspan="9"><?php esc_html_e( 'No campaign report yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
 			<?php foreach ( $reports as $report ) : ?>
 				<tr>
 					<td><strong><?php echo esc_html( $report['title'] ); ?></strong><br><span><?php echo esc_html( $report['subject'] ); ?></span></td>
 					<td><code><?php echo esc_html( $report['status'] ); ?></code></td>
+					<td>
+						<?php if ( ! empty( $report['snapshot_id'] ) ) : ?>
+							<strong><?php echo esc_html( newsletter_campaign_kit_describe_audience_snapshot( $report ) ); ?></strong><br>
+							<span><?php echo esc_html( sprintf( _n( '%d recipient', '%d recipients', $report['snapshot_recipient_count'], 'newsletter-campaign-kit' ), $report['snapshot_recipient_count'] ) ); ?></span><br>
+							<small><?php echo esc_html( get_date_from_gmt( $report['snapshot_created_at'], 'Y-m-d H:i' ) ); ?></small>
+							<?php if ( ! empty( $report['snapshot_rules'] ) ) : ?><details><summary><?php esc_html_e( 'Stored rules', 'newsletter-campaign-kit' ); ?></summary><code><?php echo esc_html( $report['snapshot_rules'] ); ?></code></details><?php endif; ?>
+						<?php else : ?><?php esc_html_e( 'Not captured', 'newsletter-campaign-kit' ); ?><?php endif; ?>
+					</td>
 					<td><?php echo esc_html( number_format_i18n( $report['queued_total'] ) ); ?></td>
 					<td><?php echo esc_html( number_format_i18n( $report['sent_total'] ) ); ?></td>
 					<td><?php echo esc_html( number_format_i18n( $report['failed_total'] ) ); ?></td>

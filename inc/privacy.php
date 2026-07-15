@@ -58,6 +58,14 @@ function newsletter_campaign_kit_privacy_exporter( $email_address, $page = 1 ) {
 				array( 'name' => __( 'Updated', 'newsletter-campaign-kit' ), 'value' => $subscriber['updated_at'] ),
 			),
 		);
+		if ( newsletter_campaign_kit_audience_snapshot_tables_exist() ) {
+			$snapshot_members = newsletter_campaign_kit_get_audience_snapshot_members_table();
+			$snapshots        = newsletter_campaign_kit_get_audience_snapshots_table();
+			$snapshot_count   = absint( $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$snapshot_members} sm INNER JOIN {$snapshots} sn ON sn.id = sm.snapshot_id WHERE sm.subscriber_id = %d", $subscriber['id'] ) ) );
+			if ( $snapshot_count ) {
+				$data[ count( $data ) - 1 ]['data'][] = array( 'name' => __( 'Campaign audience snapshots', 'newsletter-campaign-kit' ), 'value' => $snapshot_count );
+			}
+		}
 	}
 
 	$suppressions = newsletter_campaign_kit_get_suppressions_table();
@@ -96,7 +104,7 @@ function newsletter_campaign_kit_add_privacy_policy_content() {
 	if ( ! function_exists( 'wp_add_privacy_policy_content' ) ) {
 		return;
 	}
-	$content = '<p>' . esc_html__( 'Newsletter Campaign Kit stores subscription status, consent source, list assignments and thematic preferences. Delivery suppressions retain a keyed email hash and a reason so an erased or re-imported contact is not contacted again. Administrators can export or erase identifiable subscription data with the native WordPress privacy tools.', 'newsletter-campaign-kit' ) . '</p>';
+	$content = '<p>' . esc_html__( 'Newsletter Campaign Kit stores subscription status, consent source, list assignments and thematic preferences. Delivery suppressions retain a keyed email hash and a reason so an erased or re-imported contact is not contacted again. Campaign snapshots retain an opaque, campaign-specific membership key after erasure, without the email or subscriber ID, so historical audience totals remain explainable. Administrators can export or erase identifiable subscription data with the native WordPress privacy tools.', 'newsletter-campaign-kit' ) . '</p>';
 	wp_add_privacy_policy_content( __( 'Newsletter subscriptions', 'newsletter-campaign-kit' ), wp_kses_post( $content ) );
 }
 add_action( 'admin_init', 'newsletter_campaign_kit_add_privacy_policy_content' );
@@ -122,6 +130,15 @@ function newsletter_campaign_kit_privacy_eraser( $email_address, $page = 1 ) {
 	if ( $subscriber_id ) {
 		$wpdb->query( 'START TRANSACTION' );
 		$success = true;
+		$snapshot_members_retained = false;
+		if ( newsletter_campaign_kit_audience_snapshot_tables_exist() ) {
+			$snapshot_members = newsletter_campaign_kit_get_audience_snapshot_members_table();
+			$member_count     = absint( $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$snapshot_members} WHERE subscriber_id = %d", $subscriber_id ) ) );
+			if ( $member_count ) {
+				$success = false !== $wpdb->update( $snapshot_members, array( 'subscriber_id' => null ), array( 'subscriber_id' => $subscriber_id ), array( '%d' ), array( '%d' ) );
+				$snapshot_members_retained = $success;
+			}
+		}
 		$tables = array(
 			newsletter_campaign_kit_get_queue_table(),
 			newsletter_campaign_kit_get_subscriber_topics_table(),
@@ -147,6 +164,10 @@ function newsletter_campaign_kit_privacy_eraser( $email_address, $page = 1 ) {
 			return $response;
 		}
 		$response['items_removed'] = true;
+		if ( $snapshot_members_retained ) {
+			$response['items_retained'] = true;
+			$response['messages'][]     = __( 'Opaque campaign-specific audience membership keys were retained without the email or subscriber ID to preserve historical campaign totals.', 'newsletter-campaign-kit' );
+		}
 	}
 
 	if ( $active_suppression ) {

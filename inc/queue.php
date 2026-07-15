@@ -43,25 +43,46 @@ function newsletter_campaign_kit_get_campaign_recipients( $campaign ) {
 	return newsletter_campaign_kit_filter_campaign_recipients( $recipients, $topic_id );
 }
 
-function newsletter_campaign_kit_enqueue_campaign( $campaign_id ) {
+function newsletter_campaign_kit_enqueue_campaign( $campaign_id, $manage_transaction = true ) {
 	global $wpdb;
 
 	$campaign = newsletter_campaign_kit_get_campaign( $campaign_id );
-	if ( ! $campaign || ! newsletter_campaign_kit_queue_table_exists() ) {
-		return 0;
+	if ( ! $campaign || ! newsletter_campaign_kit_queue_table_exists() || ! newsletter_campaign_kit_audience_snapshot_tables_exist() ) {
+		return new WP_Error( 'newsletter_delivery_storage_unavailable', __( 'Campaign delivery storage is unavailable.', 'newsletter-campaign-kit' ) );
 	}
 
 	$queue_table = newsletter_campaign_kit_get_queue_table();
-	$recipients  = newsletter_campaign_kit_get_campaign_recipients( $campaign );
 	$created     = 0;
 	$now         = current_time( 'mysql', true );
+	if ( $manage_transaction ) {
+		$wpdb->query( 'START TRANSACTION' );
+	}
+	$locked_campaign = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . newsletter_campaign_kit_get_campaigns_table() . ' WHERE id = %d FOR UPDATE', absint( $campaign_id ) ), ARRAY_A );
+	if ( ! $locked_campaign ) {
+		if ( $manage_transaction ) {
+			$wpdb->query( 'ROLLBACK' );
+		}
+		return new WP_Error( 'newsletter_campaign_not_found', __( 'Campaign not found.', 'newsletter-campaign-kit' ) );
+	}
+	$snapshot = newsletter_campaign_kit_get_campaign_audience_snapshot( $campaign_id );
+	if ( ! $snapshot ) {
+		$recipients = newsletter_campaign_kit_get_campaign_recipients( $locked_campaign );
+		$snapshot   = newsletter_campaign_kit_create_audience_snapshot( $locked_campaign, $recipients, get_current_user_id() );
+		if ( is_wp_error( $snapshot ) ) {
+			if ( $manage_transaction ) {
+				$wpdb->query( 'ROLLBACK' );
+			}
+			return $snapshot;
+		}
+	}
+	$recipient_ids = newsletter_campaign_kit_get_audience_snapshot_member_ids( $snapshot['id'] );
 
-	foreach ( $recipients as $recipient ) {
+	foreach ( $recipient_ids as $subscriber_id ) {
 		$ok = $wpdb->query(
 			$wpdb->prepare(
 				"INSERT IGNORE INTO {$queue_table} (campaign_id, subscriber_id, status, attempts, next_attempt_at, created_at, updated_at) VALUES (%d, %d, %s, %d, %s, %s, %s)",
 				absint( $campaign['id'] ),
-				absint( $recipient['id'] ),
+				absint( $subscriber_id ),
 				'pending',
 				0,
 				$now,
@@ -69,13 +90,22 @@ function newsletter_campaign_kit_enqueue_campaign( $campaign_id ) {
 				$now
 			)
 		);
+		if ( false === $ok ) {
+			if ( $manage_transaction ) {
+				$wpdb->query( 'ROLLBACK' );
+			}
+			return new WP_Error( 'newsletter_queue_create_failed', __( 'The campaign queue could not be created.', 'newsletter-campaign-kit' ) );
+		}
 		if ( $ok ) {
 			++$created;
 		}
 	}
+	if ( $manage_transaction ) {
+		$wpdb->query( 'COMMIT' );
+	}
 
 	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
-		newsletter_campaign_kit_log_event( 'newsletter_campaign_queue_enqueued', 'success', 0, array( 'campaign_id' => absint( $campaign['id'] ), 'created' => $created, 'recipients' => count( $recipients ) ) );
+		newsletter_campaign_kit_log_event( 'newsletter_campaign_queue_enqueued', 'success', 0, array( 'campaign_id' => absint( $campaign['id'] ), 'snapshot_id' => absint( $snapshot['id'] ), 'created' => $created, 'recipients' => count( $recipient_ids ) ) );
 	}
 
 	return $created;
@@ -94,8 +124,7 @@ function newsletter_campaign_kit_sync_queue_for_campaign_transition( $campaign_i
 	$now         = current_time( 'mysql', true );
 
 	if ( 'sending' === $next_status ) {
-		newsletter_campaign_kit_enqueue_campaign( $campaign_id );
-		return;
+		return newsletter_campaign_kit_enqueue_campaign( $campaign_id );
 	}
 
 	if ( in_array( $next_status, array( 'paused', 'cancelled' ), true ) ) {
@@ -109,6 +138,8 @@ function newsletter_campaign_kit_sync_queue_for_campaign_transition( $campaign_i
 			)
 		);
 	}
+
+	return true;
 }
 
 function newsletter_campaign_kit_get_queue_counts( $campaign_id = 0 ) {

@@ -47,6 +47,7 @@ function newsletter_campaign_kit_claim_due_campaigns( $limit = 10 ) {
 
 	foreach ( $ids as $campaign_id ) {
 		$campaign_id = absint( $campaign_id );
+		$wpdb->query( 'START TRANSACTION' );
 		$updated     = $wpdb->query(
 			$wpdb->prepare(
 				"UPDATE {$table} SET status = 'sending', updated_at = %s WHERE id = %d AND status = 'scheduled' AND scheduled_at <= %s",
@@ -56,8 +57,18 @@ function newsletter_campaign_kit_claim_due_campaigns( $limit = 10 ) {
 			)
 		);
 		if ( 1 === $updated ) {
-			newsletter_campaign_kit_enqueue_campaign( $campaign_id );
+			$enqueued = newsletter_campaign_kit_enqueue_campaign( $campaign_id, false );
+			if ( is_wp_error( $enqueued ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+					newsletter_campaign_kit_log_event( 'newsletter_campaign_schedule_claim_failed', 'failure', 0, array( 'campaign_id' => $campaign_id, 'reason' => $enqueued->get_error_code() ) );
+				}
+				continue;
+			}
+			$wpdb->query( 'COMMIT' );
 			$claimed[] = $campaign_id;
+		} else {
+			$wpdb->query( 'ROLLBACK' );
 		}
 	}
 

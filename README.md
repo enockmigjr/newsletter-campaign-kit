@@ -31,6 +31,8 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Finaliser automatiquement les campagnes lorsque leur file ne contient plus de travail actif.
 - Configurer un provider `wp_mail` ou un adaptateur externe via filtre WordPress.
 - Afficher un reporting de livraison par campagne depuis la queue.
+- Capturer une fois l'audience au premier envoi avec regles, libelles et IDs internes des destinataires, puis reutiliser ce snapshot immutable aux relances; apres effacement, l'ID devient une cle opaque propre au snapshot.
+- Creer snapshot, membres et queue dans la meme transaction pour les envois manuels et programmes.
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
 - Integrer les exports, effacements et le guide de confidentialite natifs de WordPress.
 - Exposer aux integrations serveur l'abonnement correspondant a l'e-mail du compte, sans endpoint public de recherche.
@@ -61,6 +63,8 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `{$wpdb->prefix}newsletter_campaign_campaigns`
 - `{$wpdb->prefix}newsletter_campaign_templates`
 - `{$wpdb->prefix}newsletter_campaign_queue`
+- `{$wpdb->prefix}newsletter_campaign_audience_snapshots`
+- `{$wpdb->prefix}newsletter_campaign_audience_snapshot_members`
 
 ## Options
 
@@ -129,6 +133,7 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 21. Executer `wp eval-file tests/runtime-lifecycle.php` pour verifier edition/verrouillage/duplication des campagnes, lifecycle des segments, volumes d'audience et garde d'archivage.
 22. Verifier dans `runtime-preferences.php` que la lecture interne d'un abonnement est bornee a un e-mail valide.
 23. Executer `wp eval-file tests/runtime-import.php` pour verifier preview, mapping, doublons, suppressions, consentement, reactivation, affectations et transactions par ligne.
+24. Executer `wp eval-file tests/runtime-audience-snapshots.php` pour verifier immutabilite, idempotence, rollback, minimisation, cron et reporting admin.
 
 ## Hooks publics
 
@@ -142,7 +147,6 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 ## Reste majeur
 
 - Export avance des listes, tags et segments (l'import CSV des abonnes et de leurs affectations est operationnel).
-- Snapshots d'audience immuables permettant d'expliquer le ciblage apres envoi.
 - Bibliotheque de blocs editoriaux au-dela des templates complets.
 - Provider API externe avance avec secrets hors Git.
 - Provider abstraction SMTP/API.

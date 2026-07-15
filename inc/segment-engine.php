@@ -98,19 +98,39 @@ function newsletter_campaign_kit_normalize_segment_rules( $input ) {
 	return $rules;
 }
 
-function newsletter_campaign_kit_get_segments( $include_archived = false ) {
+function newsletter_campaign_kit_get_segments( $include_archived = false, $limit = 0, $offset = 0 ) {
 	global $wpdb;
 
 	if ( ! newsletter_campaign_kit_dynamic_tables_exist() ) {
 		return array();
 	}
 
-	$table = newsletter_campaign_kit_get_segments_table();
+	$table  = newsletter_campaign_kit_get_segments_table();
+	$limit  = absint( $limit );
+	$offset = absint( $offset );
 	if ( $include_archived ) {
-		return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY updated_at DESC", ARRAY_A );
+		$sql = "SELECT * FROM {$table} ORDER BY updated_at DESC";
+	} else {
+		$sql = $wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY updated_at DESC", 'active' );
+	}
+	if ( $limit ) {
+		$sql = $wpdb->prepare( $sql . ' LIMIT %d OFFSET %d', min( 100, $limit ), $offset );
 	}
 
-	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY updated_at DESC", 'active' ), ARRAY_A );
+	return $wpdb->get_results( $sql, ARRAY_A );
+}
+
+function newsletter_campaign_kit_count_segments( $include_archived = false ) {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_dynamic_tables_exist() ) {
+		return 0;
+	}
+
+	$table = newsletter_campaign_kit_get_segments_table();
+	return $include_archived
+		? (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" )
+		: (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE status = %s", 'active' ) );
 }
 
 function newsletter_campaign_kit_get_segment( $segment_id, $include_archived = false ) {
@@ -129,15 +149,33 @@ function newsletter_campaign_kit_get_segment( $segment_id, $include_archived = f
 	return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d AND status = %s LIMIT 1", $segment_id, 'active' ), ARRAY_A );
 }
 
-function newsletter_campaign_kit_get_topics() {
+function newsletter_campaign_kit_get_topics( $limit = 0, $offset = 0 ) {
 	global $wpdb;
 
 	if ( ! newsletter_campaign_kit_dynamic_tables_exist() ) {
 		return array();
 	}
 
+	$table  = newsletter_campaign_kit_get_topics_table();
+	$limit  = absint( $limit );
+	$offset = absint( $offset );
+	$sql    = "SELECT * FROM {$table} WHERE status = 'active' ORDER BY name ASC";
+	if ( $limit ) {
+		$sql = $wpdb->prepare( $sql . ' LIMIT %d OFFSET %d', min( 100, $limit ), $offset );
+	}
+
+	return $wpdb->get_results( $sql, ARRAY_A );
+}
+
+function newsletter_campaign_kit_count_topics() {
+	global $wpdb;
+
+	if ( ! newsletter_campaign_kit_dynamic_tables_exist() ) {
+		return 0;
+	}
+
 	$table = newsletter_campaign_kit_get_topics_table();
-	return $wpdb->get_results( "SELECT * FROM {$table} WHERE status = 'active' ORDER BY name ASC", ARRAY_A );
+	return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status = 'active'" );
 }
 
 function newsletter_campaign_kit_record_is_active( $table, $record_id ) {

@@ -184,6 +184,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 30. Executer `wp eval-file tests/runtime-editorial-blocks.php` puis `node tests/campaign-blocks.js` pour verifier migration, sanitization, lifecycle, capability et insertion HTML/texte au curseur.
 31. Executer `wp eval-file tests/runtime-advanced-exports.php` pour verifier exports audiences/campagnes, pagination complete des abonnes, UTF-8, anti-formule CSV, capability et nonce.
 32. Executer `wp eval-file tests/runtime-admin-pagination.php` pour verifier pagination et filtres des abonnes, suppressions, audits, campagnes, modeles, blocs et file de livraison.
+33. Executer `wp eval-file tests/runtime-audience-admin-pagination.php` pour verifier les paginations independantes des listes, tags, segments dynamiques et sujets de campagne.
 
 ## Hooks publics
 

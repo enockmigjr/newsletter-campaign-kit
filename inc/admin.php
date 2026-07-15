@@ -332,33 +332,20 @@ function newsletter_campaign_kit_handle_export_subscribers() {
 
 	check_admin_referer( 'newsletter_campaign_kit_export_subscribers' );
 
-	$subscribers = newsletter_campaign_kit_get_subscribers( array( 'limit' => 100 ) );
-	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
-		newsletter_campaign_kit_log_event( 'newsletter_export_subscribers', 'success', 0, array( 'count' => count( $subscribers ) ) );
-	}
-
+	nocache_headers();
 	header( 'Content-Type: text/csv; charset=utf-8' );
-	header( 'Content-Disposition: attachment; filename=newsletter-subscribers.csv' );
+	header( 'Content-Disposition: attachment; filename="newsletter-subscribers.csv"' );
+	header( 'X-Content-Type-Options: nosniff' );
 
 	$output = fopen( 'php://output', 'w' );
 	if ( false === $output ) {
 		exit;
 	}
 
-	fputcsv( $output, array( 'email', 'status', 'source', 'created_at', 'updated_at' ) );
-	foreach ( $subscribers as $subscriber ) {
-		fputcsv(
-			$output,
-			array(
-				$subscriber['email'],
-				$subscriber['status'],
-				$subscriber['source'],
-				$subscriber['created_at'],
-				$subscriber['updated_at'],
-			)
-		);
+	$count = newsletter_campaign_kit_stream_subscribers_csv( $output );
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event( 'newsletter_export_subscribers', is_wp_error( $count ) ? 'failure' : 'success', 0, array( 'count' => is_wp_error( $count ) ? 0 : $count ) );
 	}
-
 	fclose( $output );
 	exit;
 }

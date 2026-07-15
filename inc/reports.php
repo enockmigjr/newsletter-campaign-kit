@@ -20,7 +20,7 @@ function newsletter_campaign_kit_get_campaign_reports( $limit = 50 ) {
 	$queue_table     = newsletter_campaign_kit_get_queue_table();
 	$snapshots_table = newsletter_campaign_kit_get_audience_snapshots_table();
 	$has_snapshots   = newsletter_campaign_kit_audience_snapshot_tables_exist();
-	$limit           = max( 1, min( 100, absint( $limit ) ) );
+	$limit           = max( 1, min( 50000, absint( $limit ) ) );
 	$snapshot_select = $has_snapshots
 		? 'sn.id AS snapshot_id, sn.audience_type, sn.audience_label, sn.topic_label, sn.rules AS snapshot_rules, sn.recipient_count AS snapshot_recipient_count, sn.created_at AS snapshot_created_at'
 		: "NULL AS snapshot_id, NULL AS audience_type, NULL AS audience_label, NULL AS topic_label, NULL AS snapshot_rules, 0 AS snapshot_recipient_count, NULL AS snapshot_created_at";
@@ -62,23 +62,27 @@ function newsletter_campaign_kit_get_campaign_reports( $limit = 50 ) {
 }
 
 function newsletter_campaign_kit_get_campaign_report_totals() {
-	$reports = newsletter_campaign_kit_get_campaign_reports( 100 );
-	$totals  = array(
-		'campaigns' => count( $reports ),
-		'queued'    => 0,
-		'sent'      => 0,
-		'failed'    => 0,
-		'pending'   => 0,
-	);
+	global $wpdb;
 
-	foreach ( $reports as $report ) {
-		$totals['queued']  += absint( $report['queued_total'] );
-		$totals['sent']    += absint( $report['sent_total'] );
-		$totals['failed']  += absint( $report['failed_total'] );
-		$totals['pending'] += absint( $report['pending_total'] );
+	$empty = array( 'campaigns' => 0, 'queued' => 0, 'sent' => 0, 'failed' => 0, 'pending' => 0 );
+	if ( ! newsletter_campaign_kit_campaigns_table_exists() || ! newsletter_campaign_kit_queue_table_exists() ) {
+		return $empty;
+	}
+	$campaigns = newsletter_campaign_kit_get_campaigns_table();
+	$queue     = newsletter_campaign_kit_get_queue_table();
+	$row       = $wpdb->get_row(
+		"SELECT COUNT(DISTINCT c.id) AS campaigns, COUNT(q.id) AS queued,
+		SUM(CASE WHEN q.status = 'sent' THEN 1 ELSE 0 END) AS sent,
+		SUM(CASE WHEN q.status = 'failed' THEN 1 ELSE 0 END) AS failed,
+		SUM(CASE WHEN q.status = 'pending' THEN 1 ELSE 0 END) AS pending
+		FROM {$campaigns} c LEFT JOIN {$queue} q ON q.campaign_id = c.id",
+		ARRAY_A
+	);
+	if ( ! is_array( $row ) ) {
+		return $empty;
 	}
 
-	return $totals;
+	return array_map( 'absint', wp_parse_args( $row, $empty ) );
 }
 
 function newsletter_campaign_kit_register_reports_menu() {
@@ -104,6 +108,7 @@ function newsletter_campaign_kit_render_reports_page() {
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Campaign reports', 'newsletter-campaign-kit' ); ?></h1>
 		<p><?php esc_html_e( 'Delivery totals built from the queue. Open and click tracking are intentionally not reported until tracking endpoints exist.', 'newsletter-campaign-kit' ); ?></p>
+		<p><a class="button" href="<?php echo esc_url( newsletter_campaign_kit_get_export_url( 'campaigns' ) ); ?>"><span class="dashicons dashicons-download" aria-hidden="true"></span> <?php esc_html_e( 'Export campaign reports', 'newsletter-campaign-kit' ); ?></a></p>
 
 		<div class="nck-grid">
 			<div class="nck-card"><span><?php esc_html_e( 'Campaigns', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $totals['campaigns'] ) ); ?></strong></div>

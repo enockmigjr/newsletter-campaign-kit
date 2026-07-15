@@ -246,6 +246,13 @@ function newsletter_campaign_kit_render_segments_page() {
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Lists & segments', 'newsletter-campaign-kit' ); ?></h1>
 		<p><?php esc_html_e( 'Prepare editorial audiences with reusable lists and subscriber tags.', 'newsletter-campaign-kit' ); ?></p>
+		<?php if ( current_user_can( 'newsletter_view_reports' ) ) : ?>
+			<p class="nck-inline-actions">
+				<?php foreach ( array( 'lists' => __( 'Export lists', 'newsletter-campaign-kit' ), 'tags' => __( 'Export tags', 'newsletter-campaign-kit' ), 'segments' => __( 'Export segments', 'newsletter-campaign-kit' ), 'topics' => __( 'Export topics', 'newsletter-campaign-kit' ) ) as $export_kind => $export_label ) : ?>
+					<a class="button" href="<?php echo esc_url( newsletter_campaign_kit_get_export_url( $export_kind ) ); ?>"><span class="dashicons dashicons-download" aria-hidden="true"></span> <?php echo esc_html( $export_label ); ?></a>
+				<?php endforeach; ?>
+			</p>
+		<?php endif; ?>
 
 		<?php if ( ! newsletter_campaign_kit_segments_tables_exist() ) : ?>
 			<div class="notice notice-warning"><p><?php esc_html_e( 'Segment tables are not installed yet. Reactivate or upgrade the plugin with the database available.', 'newsletter-campaign-kit' ); ?></p></div>

@@ -12,6 +12,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Supporter le one-click unsubscribe RFC 8058 par POST idempotent et en-tetes `List-Unsubscribe`.
 - Bloquer la reactivation publique des contacts explicitement `suppressed` et verifier leur statut avant chaque envoi.
 - Fournir une premiere UI admin pour consulter, filtrer, changer le statut et exporter les abonnes.
+- Exporter sans troncature les abonnes par lots, ainsi que les listes, tags, segments, thematiques et rapports de campagne, avec neutralisation des formules CSV.
 - Importer des abonnes par CSV avec mapping d'en-tetes, preview non mutative, rapport temporaire et application transactionnelle par ligne.
 - Refuser les doublons du fichier, audiences inconnues, suppressions actives et reactivations sans option et consentement explicites.
 - Creer des listes et tags de segmentation avec liaisons abonnes/listes/tags.
@@ -114,6 +115,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 - `admin_post_newsletter_campaign_kit_update_subscriber_status`
 - `admin_post_newsletter_campaign_kit_release_suppression`
 - `admin_post_newsletter_campaign_kit_export_subscribers`
+- `admin_post_newsletter_campaign_kit_operational_export`
 - `admin_post_newsletter_campaign_kit_import_csv`
 - `admin_post_newsletter_campaign_kit_create_list`
 - `admin_post_newsletter_campaign_kit_create_tag`
@@ -168,6 +170,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 28. Executer `wp eval-file tests/runtime-scheduler-operations.php` pour verifier retention pending, verrous, batch configure, exceptions provider et cinq etats de sante cron.
 29. Executer `wp eval-file tests/runtime-campaign-confirmation.php` pour verifier titre exact, preuve d'audience obsolete, atomicite de l'envoi, reprise apres pause, audience programmee figee et ecran de revue admin.
 30. Executer `wp eval-file tests/runtime-editorial-blocks.php` puis `node tests/campaign-blocks.js` pour verifier migration, sanitization, lifecycle, capability et insertion HTML/texte au curseur.
+31. Executer `wp eval-file tests/runtime-advanced-exports.php` pour verifier exports audiences/campagnes, pagination complete des abonnes, UTF-8, anti-formule CSV, capability et nonce.
 
 ## Hooks publics
 
@@ -176,6 +179,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 - `newsletter_campaign_kit_send_email`: branche un provider externe sans stocker ses secrets dans le plugin.
 - `newsletter_campaign_kit_http_provider_config`: injecte endpoint, cle API, secret webhook et timeout depuis la configuration serveur.
 - `newsletter_campaign_kit_block_categories`: etend les categories bornees de la bibliotheque de blocs.
+- `newsletter_campaign_kit_export_row_limit`: borne entre 100 et 50 000 les datasets operationnels charges en memoire; l'export HTTP des abonnes utilise une pagination streaming independante.
 - `wp_privacy_personal_data_exporters` et `wp_privacy_personal_data_erasers`: exportent ou effacent les donnees identifiantes de l'abonne.
 
 La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppression active doit continuer a bloquer les remises. Le registre ne contient pas l'adresse brute. Les preuves de provider conservent une cle d'evenement opaque et sont dissociees de l'abonne efface. La levee d'une suppression place un contact encore present en statut `unsubscribed`; elle ne constitue jamais un consentement.
@@ -186,7 +190,7 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 - Adaptateurs natifs propres aux fournisseurs (Brevo, Mailgun, Postmark, SES) au-dessus du contrat HTTP generique.
 - Validation en staging avec un domaine expediteur, DKIM et identifiants reels du fournisseur retenu.
 - Alertes externes, metriques provider et supervision distribuee des confirmations/abus lorsque l'hebergeur final est connu.
-- Tracking ouvertures/clics et exports de reporting avances.
+- Tracking ouvertures/clics avec consentement et statistiques associees.
 
 ## References officielles
 

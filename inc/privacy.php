@@ -66,6 +66,13 @@ function newsletter_campaign_kit_privacy_exporter( $email_address, $page = 1 ) {
 				$data[ count( $data ) - 1 ]['data'][] = array( 'name' => __( 'Campaign audience snapshots', 'newsletter-campaign-kit' ), 'value' => $snapshot_count );
 			}
 		}
+		$provider_events = newsletter_campaign_kit_get_provider_events_table();
+		if ( newsletter_campaign_kit_table_exists( $provider_events ) ) {
+			$provider_event_count = absint( $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$provider_events} WHERE subscriber_id = %d", $subscriber['id'] ) ) );
+			if ( $provider_event_count ) {
+				$data[ count( $data ) - 1 ]['data'][] = array( 'name' => __( 'Delivery provider events', 'newsletter-campaign-kit' ), 'value' => $provider_event_count );
+			}
+		}
 	}
 
 	$suppressions = newsletter_campaign_kit_get_suppressions_table();
@@ -104,7 +111,7 @@ function newsletter_campaign_kit_add_privacy_policy_content() {
 	if ( ! function_exists( 'wp_add_privacy_policy_content' ) ) {
 		return;
 	}
-	$content = '<p>' . esc_html__( 'Newsletter Campaign Kit stores subscription status, consent source, list assignments and thematic preferences. Delivery suppressions retain a keyed email hash and a reason so an erased or re-imported contact is not contacted again. Campaign snapshots retain an opaque, campaign-specific membership key after erasure, without the email or subscriber ID, so historical audience totals remain explainable. Administrators can export or erase identifiable subscription data with the native WordPress privacy tools.', 'newsletter-campaign-kit' ) . '</p>';
+	$content = '<p>' . esc_html__( 'Newsletter Campaign Kit stores subscription status, consent source, list assignments and thematic preferences. Delivery suppressions retain a keyed email hash and a reason so an erased or re-imported contact is not contacted again. Campaign snapshots and provider event proofs retain opaque keys after erasure, without the email or subscriber ID, so historical audience totals and suppression processing remain explainable. Administrators can export or erase identifiable subscription data with the native WordPress privacy tools.', 'newsletter-campaign-kit' ) . '</p>';
 	wp_add_privacy_policy_content( __( 'Newsletter subscriptions', 'newsletter-campaign-kit' ), wp_kses_post( $content ) );
 }
 add_action( 'admin_init', 'newsletter_campaign_kit_add_privacy_policy_content' );
@@ -131,12 +138,21 @@ function newsletter_campaign_kit_privacy_eraser( $email_address, $page = 1 ) {
 		$wpdb->query( 'START TRANSACTION' );
 		$success = true;
 		$snapshot_members_retained = false;
+		$provider_events_retained  = false;
 		if ( newsletter_campaign_kit_audience_snapshot_tables_exist() ) {
 			$snapshot_members = newsletter_campaign_kit_get_audience_snapshot_members_table();
 			$member_count     = absint( $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$snapshot_members} WHERE subscriber_id = %d", $subscriber_id ) ) );
 			if ( $member_count ) {
 				$success = false !== $wpdb->update( $snapshot_members, array( 'subscriber_id' => null ), array( 'subscriber_id' => $subscriber_id ), array( '%d' ), array( '%d' ) );
 				$snapshot_members_retained = $success;
+			}
+		}
+		$provider_events = newsletter_campaign_kit_get_provider_events_table();
+		if ( $success && newsletter_campaign_kit_table_exists( $provider_events ) ) {
+			$provider_event_count = absint( $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$provider_events} WHERE subscriber_id = %d", $subscriber_id ) ) );
+			if ( $provider_event_count ) {
+				$success                  = false !== $wpdb->update( $provider_events, array( 'subscriber_id' => null ), array( 'subscriber_id' => $subscriber_id ), array( '%d' ), array( '%d' ) );
+				$provider_events_retained = $success;
 			}
 		}
 		$tables = array(
@@ -167,6 +183,10 @@ function newsletter_campaign_kit_privacy_eraser( $email_address, $page = 1 ) {
 		if ( $snapshot_members_retained ) {
 			$response['items_retained'] = true;
 			$response['messages'][]     = __( 'Opaque campaign-specific audience membership keys were retained without the email or subscriber ID to preserve historical campaign totals.', 'newsletter-campaign-kit' );
+		}
+		if ( $provider_events_retained ) {
+			$response['items_retained'] = true;
+			$response['messages'][]     = __( 'Opaque provider event proofs were retained without the email or subscriber ID to preserve bounce and complaint processing history.', 'newsletter-campaign-kit' );
 		}
 	}
 

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.9.0
+ * Version: 0.10.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.9.0' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.10.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
@@ -123,6 +123,12 @@ function newsletter_campaign_kit_get_templates_table() {
 	global $wpdb;
 
 	return $wpdb->prefix . 'newsletter_campaign_templates';
+}
+
+function newsletter_campaign_kit_get_provider_events_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_provider_events';
 }
 
 /** Return whether one plugin table exists in the current site. */
@@ -406,6 +412,24 @@ function newsletter_campaign_kit_activate() {
 	dbDelta( $subscriber_topics_sql );
 	dbDelta( $suppressions_sql );
 
+	$provider_events_table = newsletter_campaign_kit_get_provider_events_table();
+	$provider_events_sql   = "CREATE TABLE {$provider_events_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		event_key char(64) NOT NULL,
+		event_type varchar(24) NOT NULL,
+		status varchar(24) NOT NULL DEFAULT 'received',
+		subscriber_id bigint(20) unsigned NULL,
+		created_at datetime NOT NULL,
+		processed_at datetime NULL,
+		PRIMARY KEY  (id),
+		UNIQUE KEY event_key (event_key),
+		KEY event_type_status (event_type, status),
+		KEY subscriber_id (subscriber_id),
+		KEY created_at (created_at)
+	) {$charset_collate};";
+
+	dbDelta( $provider_events_sql );
+
 	$admin = get_role( 'administrator' );
 	if ( $admin ) {
 		foreach ( newsletter_campaign_kit_get_capabilities() as $capability ) {
@@ -450,6 +474,7 @@ require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audience-snapshots.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/templates.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/campaigns.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/http-provider.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/providers.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/queue.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/scheduler.php';

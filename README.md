@@ -29,7 +29,9 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Executer une queue batch avec verrou atomique, reprise des verrous expires et retry/backoff.
 - Programmer les campagnes dans le fuseau WordPress et les declencher chaque minute via WP-Cron.
 - Finaliser automatiquement les campagnes lorsque leur file ne contient plus de travail actif.
-- Configurer un provider `wp_mail` ou un adaptateur externe via filtre WordPress.
+- Configurer `wp_mail`, le provider JSON HTTP generique ou un adaptateur externe via filtre WordPress.
+- Envoyer au provider HTTP avec HTTPS obligatoire, Bearer secret cote serveur, corps HTML/texte et cle d'idempotence stable.
+- Recevoir les bounces et complaints via un webhook REST signe HMAC, borne a cinq minutes et protege contre le rejeu.
 - Afficher un reporting de livraison par campagne depuis la queue.
 - Capturer une fois l'audience au premier envoi avec regles, libelles et IDs internes des destinataires, puis reutiliser ce snapshot immutable aux relances; apres effacement, l'ID devient une cle opaque propre au snapshot.
 - Creer snapshot, membres et queue dans la meme transaction pour les envois manuels et programmes.
@@ -65,6 +67,7 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `{$wpdb->prefix}newsletter_campaign_queue`
 - `{$wpdb->prefix}newsletter_campaign_audience_snapshots`
 - `{$wpdb->prefix}newsletter_campaign_audience_snapshot_members`
+- `{$wpdb->prefix}newsletter_campaign_provider_events`
 
 ## Options
 
@@ -72,6 +75,10 @@ Les capabilities sont ajoutees aux administrateurs a l'activation/upgrade.
 - `newsletter_campaign_kit_provider_settings`
 
 Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dkim_confirmed`. Les en-tetes RFC 8058 ne sont emis que lorsque les deux sont actifs et que l'URL publique est en HTTPS. La signature DKIM doit couvrir `List-Unsubscribe` et `List-Unsubscribe-Post`; le plugin exige une confirmation explicite car `wp_mail()` ne permet pas de prouver cette couverture avant remise au transport.
+
+Le provider HTTP lit `NEWSLETTER_CAMPAIGN_KIT_HTTP_ENDPOINT`, `NEWSLETTER_CAMPAIGN_KIT_HTTP_API_KEY`, `NEWSLETTER_CAMPAIGN_KIT_WEBHOOK_SECRET` et, facultativement, `NEWSLETTER_CAMPAIGN_KIT_HTTP_TIMEOUT`. Ces valeurs doivent etre injectees par `wp-config.php`, l'environnement ou le filtre `newsletter_campaign_kit_http_provider_config`; elles ne sont jamais stockees dans les options.
+
+Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte un JSON `{ "id", "type", "email" }`, avec `type` egal a `bounce` ou `complaint`. Le provider signe exactement `timestamp.corps_brut` en HMAC-SHA256 dans `X-Newsletter-Signature` et fournit le timestamp Unix dans `X-Newsletter-Timestamp`.
 
 ## Actions admin-post
 
@@ -134,23 +141,24 @@ Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dki
 22. Verifier dans `runtime-preferences.php` que la lecture interne d'un abonnement est bornee a un e-mail valide.
 23. Executer `wp eval-file tests/runtime-import.php` pour verifier preview, mapping, doublons, suppressions, consentement, reactivation, affectations et transactions par ligne.
 24. Executer `wp eval-file tests/runtime-audience-snapshots.php` pour verifier immutabilite, idempotence, rollback, minimisation, cron et reporting admin.
+25. Executer `wp eval-file tests/runtime-http-provider.php` pour verifier transport 2xx, erreurs normalisees, configuration fail-closed, HMAC, expiration, rejeu et suppression automatique.
 
 ## Hooks publics
 
 - `newsletter_campaign_kit_consent_text`: personnalise le texte de consentement du projet integrateur.
 - `newsletter_campaign_kit_suppression_reasons`: etend les motifs acceptes par les providers de bounce/complaint.
 - `newsletter_campaign_kit_send_email`: branche un provider externe sans stocker ses secrets dans le plugin.
+- `newsletter_campaign_kit_http_provider_config`: injecte endpoint, cle API, secret webhook et timeout depuis la configuration serveur.
 - `wp_privacy_personal_data_exporters` et `wp_privacy_personal_data_erasers`: exportent ou effacent les donnees identifiantes de l'abonne.
 
-La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppression active doit continuer a bloquer les remises. Le registre ne contient pas l'adresse brute. Sa levee place un contact encore present en statut `unsubscribed`; elle ne constitue jamais un consentement.
+La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppression active doit continuer a bloquer les remises. Le registre ne contient pas l'adresse brute. Les preuves de provider conservent une cle d'evenement opaque et sont dissociees de l'abonne efface. La levee d'une suppression place un contact encore present en statut `unsubscribed`; elle ne constitue jamais un consentement.
 
 ## Reste majeur
 
 - Export avance des listes, tags et segments (l'import CSV des abonnes et de leurs affectations est operationnel).
 - Bibliotheque de blocs editoriaux au-dela des templates complets.
-- Provider API externe avance avec secrets hors Git.
-- Provider abstraction SMTP/API.
-- Webhooks signes pour automatiser bounces et complaints vers le registre de suppression.
+- Adaptateurs natifs propres aux fournisseurs (Brevo, Mailgun, Postmark, SES) au-dessus du contrat HTTP generique.
+- Validation en staging avec un domaine expediteur, DKIM et identifiants reels du fournisseur retenu.
 - Tracking ouvertures/clics et exports de reporting avances.
 
 ## References officielles
@@ -159,6 +167,8 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 - [WordPress Code Reference - wp_schedule_event](https://developer.wordpress.org/reference/functions/wp_schedule_event/)
 - [WordPress Code Reference - wp_clear_scheduled_hook](https://developer.wordpress.org/reference/functions/wp_clear_scheduled_hook/)
 - [WordPress Code Reference - wp_mail](https://developer.wordpress.org/reference/functions/wp_mail/)
+- [WordPress Code Reference - wp_safe_remote_post](https://developer.wordpress.org/reference/functions/wp_safe_remote_post/)
+- [WordPress REST API - Adding custom endpoints](https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-custom-endpoints/)
 - [WordPress Plugin Handbook - Privacy](https://developer.wordpress.org/plugins/privacy/)
 - [WordPress Personal Data Eraser](https://developer.wordpress.org/plugins/privacy/adding-the-personal-data-eraser-to-your-plugin/)
 - [WordPress Nonces](https://developer.wordpress.org/apis/security/nonces/)

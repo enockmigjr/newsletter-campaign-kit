@@ -123,10 +123,17 @@ function newsletter_campaign_kit_render_settings_page() {
 	$http_status     = function_exists( 'newsletter_campaign_kit_get_http_provider_status' ) ? newsletter_campaign_kit_get_http_provider_status() : array();
 	$native_status   = function_exists( 'newsletter_campaign_kit_get_native_provider_status' ) ? newsletter_campaign_kit_get_native_provider_status() : array();
 	$topics          = function_exists( 'newsletter_campaign_kit_get_topics' ) ? newsletter_campaign_kit_get_topics( 100, 0 ) : array();
+	$provider_test   = isset( $_GET['provider-test'] ) ? sanitize_key( wp_unslash( $_GET['provider-test'] ) ) : '';
+	$test_code       = isset( $_GET['provider-test-code'] ) ? sanitize_key( wp_unslash( $_GET['provider-test-code'] ) ) : '';
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Newsletter settings', 'newsletter-campaign-kit' ); ?></h1>
 		<p><?php esc_html_e( 'Configure the delivery adapter used by the queue. API providers should be connected through the provider filter without storing secrets in this plugin.', 'newsletter-campaign-kit' ); ?></p>
+		<?php if ( 'sent' === $provider_test ) : ?>
+			<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'The selected provider accepted the test email. Confirm its arrival and inspect its authentication headers.', 'newsletter-campaign-kit' ); ?></p></div>
+		<?php elseif ( 'failed' === $provider_test ) : ?>
+			<div class="notice notice-error is-dismissible"><p><?php echo esc_html( sprintf( __( 'The provider test failed (%s). Check the provider credentials and delivery logs.', 'newsletter-campaign-kit' ), $test_code ?: 'provider_test_failed' ) ); ?></p></div>
+		<?php endif; ?>
 		<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-panel nck-form-table">
 			<input type="hidden" name="action" value="newsletter_campaign_kit_save_provider_settings">
 			<?php wp_nonce_field( 'newsletter_campaign_kit_save_provider_settings' ); ?>
@@ -202,9 +209,168 @@ function newsletter_campaign_kit_render_settings_page() {
 			</table>
 			<?php submit_button( __( 'Save settings', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 		</form>
+
+		<section class="nck-panel nck-provider-guide">
+			<h2><?php esc_html_e( 'Server-side credentials', 'newsletter-campaign-kit' ); ?></h2>
+			<p><?php esc_html_e( 'Place the constants before the “stop editing” line in wp-config.php, or use environment variables with the same names. Never paste keys into a WordPress form.', 'newsletter-campaign-kit' ); ?></p>
+			<details><summary><?php esc_html_e( 'Show wp-config.php examples', 'newsletter-campaign-kit' ); ?></summary><pre><?php echo esc_html( "// Brevo\ndefine( 'NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY', 'your-server-side-key' );\n\n// Resend\ndefine( 'NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY', 'your-server-side-key' );\n\n// Generic HTTPS provider\ndefine( 'NEWSLETTER_CAMPAIGN_KIT_HTTP_ENDPOINT', 'https://provider.example/send' );\ndefine( 'NEWSLETTER_CAMPAIGN_KIT_HTTP_API_KEY', 'your-server-side-key' );\ndefine( 'NEWSLETTER_CAMPAIGN_KIT_WEBHOOK_SECRET', 'at-least-32-random-characters' );" ); ?></pre></details>
+		</section>
+
+		<section class="nck-panel">
+			<h2><?php esc_html_e( 'Delivery provider test', 'newsletter-campaign-kit' ); ?></h2>
+			<p><?php echo esc_html( sprintf( __( 'Send one branded diagnostic email through the currently selected adapter: %s.', 'newsletter-campaign-kit' ), $settings['provider'] ) ); ?></p>
+			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-inline-form">
+				<input type="hidden" name="action" value="newsletter_campaign_kit_test_provider">
+				<?php wp_nonce_field( 'newsletter_campaign_kit_test_provider' ); ?>
+				<label for="nck_provider_test_email"><?php esc_html_e( 'Destination email', 'newsletter-campaign-kit' ); ?></label>
+				<input id="nck_provider_test_email" class="regular-text" name="email" type="email" value="<?php echo esc_attr( wp_get_current_user()->user_email ); ?>" required>
+				<?php submit_button( __( 'Send test email', 'newsletter-campaign-kit' ), 'secondary', 'submit', false ); ?>
+			</form>
+			<p class="description"><?php esc_html_e( 'This does not create a subscriber, campaign or queue item. Only a non-reversible recipient hash is stored in the audit log.', 'newsletter-campaign-kit' ); ?></p>
+		</section>
 	</div>
 	<?php
 }
+
+/** Build the professional message used to validate a delivery adapter. */
+function newsletter_campaign_kit_get_provider_test_message( $email ) {
+	$campaign = array(
+		'id'           => 0,
+		'subject'      => sprintf( __( '[%s] Delivery provider test', 'newsletter-campaign-kit' ), get_bloginfo( 'name' ) ),
+		'preview_text' => __( 'Your PhotoVault newsletter transport accepted a production-format message.', 'newsletter-campaign-kit' ),
+		'body'         => '<h1>' . esc_html__( 'Delivery is connected', 'newsletter-campaign-kit' ) . '</h1><p>' . esc_html__( 'This diagnostic confirms that WordPress can submit a branded newsletter email through the selected provider.', 'newsletter-campaign-kit' ) . '</p><p><strong>' . esc_html__( 'Next check:', 'newsletter-campaign-kit' ) . '</strong> ' . esc_html__( 'inspect SPF, DKIM and DMARC in the received message headers before enabling production campaigns.', 'newsletter-campaign-kit' ) . '</p>',
+		'text_body'    => __( "Delivery is connected.\n\nThis diagnostic confirms that WordPress can submit a branded newsletter email through the selected provider. Inspect SPF, DKIM and DMARC before enabling production campaigns.", 'newsletter-campaign-kit' ),
+	);
+	$subscriber = array( 'email' => $email, 'unsubscribe_token' => '' );
+
+	return array(
+		'campaign'   => $campaign,
+		'subscriber' => $subscriber,
+		'html'       => newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber ),
+		'text'       => newsletter_campaign_kit_render_campaign_text( $campaign, $subscriber ),
+	);
+}
+
+/** Deliver a diagnostic message through the selected transport without audience side effects. */
+function newsletter_campaign_kit_send_provider_test( $email ) {
+	$email = sanitize_email( $email );
+	if ( ! is_email( $email ) ) {
+		return new WP_Error( 'newsletter_invalid_recipient', __( 'Recipient email is invalid.', 'newsletter-campaign-kit' ) );
+	}
+	$settings = newsletter_campaign_kit_get_provider_settings();
+	$message  = newsletter_campaign_kit_get_provider_test_message( $email );
+	$provider = $settings['provider'];
+	$headers  = array(
+		'Content-Type: text/html; charset=UTF-8',
+		'From: ' . $settings['from_name'] . ' <' . $settings['from_email'] . '>',
+	);
+
+	if ( 'wp_mail' === $provider ) {
+		$set_alt_body = static function ( $phpmailer ) use ( $message ) {
+			$phpmailer->AltBody = $message['text'];
+		};
+		add_action( 'phpmailer_init', $set_alt_body );
+		try {
+			$sent = wp_mail( $email, $message['campaign']['subject'], $message['html'], $headers );
+		} finally {
+			remove_action( 'phpmailer_init', $set_alt_body );
+		}
+
+		return $sent ? true : new WP_Error( 'newsletter_wp_mail_failed', __( 'wp_mail could not deliver the test message.', 'newsletter-campaign-kit' ) );
+	}
+
+	if ( in_array( $provider, array( 'brevo', 'resend' ), true ) ) {
+		$key_name = 'brevo' === $provider ? 'NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY' : 'NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY';
+		$api_key  = newsletter_campaign_kit_get_delivery_secret( $key_name );
+		if ( '' === $api_key ) {
+			return new WP_Error( 'newsletter_' . $provider . '_not_configured', __( 'The selected provider API key is missing.', 'newsletter-campaign-kit' ) );
+		}
+		$idempotency = hash_hmac( 'sha256', 'provider-test:' . $provider . ':' . strtolower( $email ) . ':' . gmdate( 'Y-m-d-H-i' ), wp_salt( 'nonce' ) );
+		if ( 'brevo' === $provider ) {
+			return newsletter_campaign_kit_send_native_request(
+				'brevo',
+				'https://api.brevo.com/v3/smtp/email',
+				array( 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'api-key' => $api_key, 'Idempotency-Key' => $idempotency ),
+				array( 'sender' => array( 'name' => $settings['from_name'], 'email' => $settings['from_email'] ), 'to' => array( array( 'email' => $email ) ), 'subject' => $message['campaign']['subject'], 'htmlContent' => $message['html'], 'textContent' => $message['text'], 'tags' => array( 'provider-test' ) )
+			);
+		}
+
+		return newsletter_campaign_kit_send_native_request(
+			'resend',
+			'https://api.resend.com/emails',
+			array( 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'Authorization' => 'Bearer ' . $api_key, 'Idempotency-Key' => $idempotency ),
+			array( 'from' => $settings['from_name'] . ' <' . $settings['from_email'] . '>', 'to' => array( $email ), 'subject' => $message['campaign']['subject'], 'html' => $message['html'], 'text' => $message['text'], 'tags' => array( array( 'name' => 'message_type', 'value' => 'provider_test' ) ) )
+		);
+	}
+
+	if ( 'http_api' === $provider ) {
+		$config = newsletter_campaign_kit_get_http_provider_config();
+		if ( 'https' !== wp_parse_url( $config['endpoint'], PHP_URL_SCHEME ) || '' === $config['api_key'] ) {
+			return new WP_Error( 'newsletter_http_provider_not_configured', __( 'The HTTP provider is not securely configured.', 'newsletter-campaign-kit' ) );
+		}
+		$idempotency = hash_hmac( 'sha256', 'provider-test:' . strtolower( $email ) . ':' . gmdate( 'Y-m-d-H-i' ), wp_salt( 'nonce' ) );
+		$response    = wp_safe_remote_post(
+			$config['endpoint'],
+			array(
+				'timeout'     => $config['timeout'],
+				'redirection' => 0,
+				'headers'     => array( 'Accept' => 'application/json', 'Authorization' => 'Bearer ' . $config['api_key'], 'Content-Type' => 'application/json; charset=utf-8', 'Idempotency-Key' => $idempotency ),
+				'body'        => wp_json_encode( array( 'message_id' => $idempotency, 'recipient' => array( 'email' => $email ), 'from' => array( 'name' => $settings['from_name'], 'email' => $settings['from_email'] ), 'subject' => $message['campaign']['subject'], 'html' => $message['html'], 'text' => $message['text'], 'diagnostic' => true ) ),
+				'data_format' => 'body',
+			)
+		);
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error( 'newsletter_http_provider_unavailable', __( 'The HTTP provider could not be reached.', 'newsletter-campaign-kit' ) );
+		}
+		$status = wp_remote_retrieve_response_code( $response );
+
+		return $status >= 200 && $status < 300 ? true : new WP_Error( 'newsletter_http_provider_rejected', sprintf( __( 'The HTTP provider returned status %d.', 'newsletter-campaign-kit' ), absint( $status ) ) );
+	}
+
+	$result = apply_filters( 'newsletter_campaign_kit_send_test_email', null, $email, $message, $settings );
+
+	return true === $result || is_wp_error( $result ) ? $result : new WP_Error( 'newsletter_external_provider_not_configured', __( 'The external test-email adapter is not configured.', 'newsletter-campaign-kit' ) );
+}
+
+/** Handle a protected and rate-limited provider test request. */
+function newsletter_campaign_kit_handle_test_provider() {
+	if ( ! current_user_can( 'newsletter_manage_settings' ) ) {
+		wp_die( esc_html__( 'You are not allowed to test newsletter providers.', 'newsletter-campaign-kit' ) );
+	}
+	check_admin_referer( 'newsletter_campaign_kit_test_provider' );
+
+	$redirect = admin_url( 'admin.php?page=newsletter-campaign-kit-settings' );
+	$email    = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+	$lock_key = 'nck_provider_test_' . get_current_user_id();
+	if ( ! is_email( $email ) ) {
+		wp_safe_redirect( add_query_arg( array( 'provider-test' => 'failed', 'provider-test-code' => 'invalid_email' ), $redirect ) );
+		exit;
+	}
+	if ( get_transient( $lock_key ) ) {
+		wp_safe_redirect( add_query_arg( array( 'provider-test' => 'failed', 'provider-test-code' => 'rate_limited' ), $redirect ) );
+		exit;
+	}
+
+	set_transient( $lock_key, 1, MINUTE_IN_SECONDS );
+	$result = newsletter_campaign_kit_send_provider_test( $email );
+	$code   = is_wp_error( $result ) ? $result->get_error_code() : '';
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event(
+			'newsletter_provider_test',
+			is_wp_error( $result ) ? 'failure' : 'success',
+			0,
+			array(
+				'provider'       => newsletter_campaign_kit_get_provider_settings()['provider'],
+				'recipient_hash' => newsletter_campaign_kit_hash_email( $email ),
+				'reason'         => $code,
+			)
+		);
+	}
+
+	wp_safe_redirect( add_query_arg( array_filter( array( 'provider-test' => is_wp_error( $result ) ? 'failed' : 'sent', 'provider-test-code' => $code ) ), $redirect ) );
+	exit;
+}
+add_action( 'admin_post_newsletter_campaign_kit_test_provider', 'newsletter_campaign_kit_handle_test_provider' );
 
 function newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber ) {
 	$body         = isset( $campaign['body'] ) ? newsletter_campaign_kit_sanitize_html_body( $campaign['body'] ) : '';

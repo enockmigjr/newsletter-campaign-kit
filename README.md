@@ -124,7 +124,7 @@ define( 'NEWSLETTER_CAMPAIGN_KIT_HTTP_API_KEY', '...' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_WEBHOOK_SECRET', '...' );
 ```
 
-Ne committer aucune valeur reelle. La page Settings indique si les cles du provider selectionne sont detectees.
+Ne committer aucune valeur reelle. La page Settings indique si les cles du provider selectionne sont detectees. Le panneau `Delivery provider test` remet un email HTML/texte de diagnostic par `wp_mail`, Brevo, Resend, HTTP ou le filtre externe, sans creer d'abonne, de campagne ou d'element de queue.
 
 Les reglages publics bornent `double_opt_in_enabled`, la validite du lien (1-168 heures), le cooldown (1-1440 minutes), les tentatives (1-30) et leur fenetre (1-1440 minutes). Le token brut n'est present que dans l'email; la table abonnes conserve son HMAC, l'expiration, la date d'envoi et la date de confirmation.
 
@@ -213,6 +213,7 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 - `newsletter_campaign_kit_consent_text`: personnalise le texte de consentement du projet integrateur.
 - `newsletter_campaign_kit_suppression_reasons`: etend les motifs acceptes par les providers de bounce/complaint.
 - `newsletter_campaign_kit_send_email`: branche un provider externe sans stocker ses secrets dans le plugin.
+- `newsletter_campaign_kit_send_test_email`: branche le diagnostic d'un provider externe; retourner `true` ou `WP_Error`.
 - `newsletter_campaign_kit_http_provider_config`: injecte endpoint, cle API, secret webhook et timeout depuis la configuration serveur.
 - `newsletter_campaign_kit_block_categories`: etend les categories bornees de la bibliotheque de blocs.
 - `newsletter_campaign_kit_export_row_limit`: borne entre 100 et 50 000 les datasets operationnels charges en memoire; l'export HTTP des abonnes utilise une pagination streaming independante.

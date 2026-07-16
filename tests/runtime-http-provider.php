@@ -112,6 +112,9 @@ try {
 	newsletter_http_runtime_assert( $key === $captured_request['args']['headers']['Idempotency-Key'] && $key === $body['message_id'], 'Delivery idempotency key was not stable across headers and body.' );
 	newsletter_http_runtime_assert( $email === $body['recipient']['email'] && false !== strpos( $body['text'], 'Runtime HTTP body' ) && false !== strpos( $body['text'], 'Manage preferences' ), 'Provider payload omitted the recipient or text alternative.' );
 	newsletter_http_runtime_assert( 0 === strpos( $captured_request['args']['headers']['Authorization'], 'Bearer ' ), 'Provider authorization header is missing.' );
+	$test_sent = newsletter_campaign_kit_send_provider_test( 'provider-test-http@photovault.test' );
+	$test_body = json_decode( $captured_request['args']['body'], true );
+	newsletter_http_runtime_assert( true === $test_sent && ! empty( $test_body['diagnostic'] ) && 'provider-test-http@photovault.test' === $test_body['recipient']['email'], 'HTTP provider diagnostic did not use the isolated test contract.' );
 
 	$http_mode = 'rejected';
 	$sent      = newsletter_campaign_kit_send_with_http_api( false, $campaign, $subscriber, $queue_item );
@@ -131,6 +134,9 @@ try {
 	newsletter_http_runtime_assert( true === $sent && 'https://api.brevo.com/v3/smtp/email' === $captured_request['url'], 'Brevo delivery did not use its fixed endpoint.' );
 	newsletter_http_runtime_assert( 'runtime-brevo-key' === $captured_request['args']['headers']['api-key'] && $email === $body['to'][0]['email'], 'Brevo payload or authentication is invalid.' );
 	newsletter_http_runtime_assert( false !== strpos( $body['htmlContent'], '<!doctype html>' ) && false !== strpos( $body['textContent'], 'Runtime HTTP body' ), 'Brevo payload omitted HTML or text content.' );
+	$test_sent = newsletter_campaign_kit_send_provider_test( 'provider-test-brevo@photovault.test' );
+	$test_body = json_decode( $captured_request['args']['body'], true );
+	newsletter_http_runtime_assert( true === $test_sent && 'provider-test-brevo@photovault.test' === $test_body['to'][0]['email'] && in_array( 'provider-test', $test_body['tags'], true ), 'Brevo provider diagnostic did not use the branded test payload.' );
 
 	update_option( 'newsletter_campaign_kit_provider_settings', array( 'provider' => 'resend', 'from_name' => 'PhotoVault', 'from_email' => 'sender@photovault.test' ), false );
 	$sent = newsletter_campaign_kit_send_with_resend( false, $campaign, $subscriber, $queue_item );
@@ -138,10 +144,20 @@ try {
 	newsletter_http_runtime_assert( true === $sent && 'https://api.resend.com/emails' === $captured_request['url'], 'Resend delivery did not use its fixed endpoint.' );
 	newsletter_http_runtime_assert( 'Bearer runtime-resend-key' === $captured_request['args']['headers']['Authorization'] && $email === $body['to'][0], 'Resend payload or authentication is invalid.' );
 	newsletter_http_runtime_assert( newsletter_campaign_kit_get_delivery_idempotency_key( $campaign, $subscriber, $queue_item ) === $captured_request['args']['headers']['Idempotency-Key'], 'Native provider idempotency is not stable.' );
+	$test_sent = newsletter_campaign_kit_send_provider_test( 'provider-test-resend@photovault.test' );
+	$test_body = json_decode( $captured_request['args']['body'], true );
+	newsletter_http_runtime_assert( true === $test_sent && 'provider-test-resend@photovault.test' === $test_body['to'][0] && 'provider_test' === $test_body['tags'][0]['value'], 'Resend provider diagnostic did not use the branded test payload.' );
 	$native_secrets['NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY'] = '';
 	$sent = newsletter_campaign_kit_send_with_resend( false, $campaign, $subscriber, $queue_item );
 	newsletter_http_runtime_assert( is_wp_error( $sent ) && 'newsletter_resend_not_configured' === $sent->get_error_code(), 'Missing Resend secret did not fail closed.' );
 	$native_secrets['NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY'] = 'runtime-resend-key';
+	update_option( 'newsletter_campaign_kit_provider_settings', array( 'provider' => 'external_filter', 'from_name' => 'PhotoVault', 'from_email' => 'sender@photovault.test' ), false );
+	$external_test = static function ( $result, $recipient, $message ) {
+		return 'provider-test-external@photovault.test' === $recipient && false !== strpos( $message['html'], 'Delivery is connected' );
+	};
+	add_filter( 'newsletter_campaign_kit_send_test_email', $external_test, 10, 3 );
+	newsletter_http_runtime_assert( true === newsletter_campaign_kit_send_provider_test( 'provider-test-external@photovault.test' ), 'External provider diagnostic filter was not invoked.' );
+	remove_filter( 'newsletter_campaign_kit_send_test_email', $external_test, 10 );
 
 	do_action( 'rest_api_init', rest_get_server() );
 	newsletter_http_runtime_assert( isset( rest_get_server()->get_routes()['/newsletter-campaign-kit/v1/provider-events'] ), 'Signed provider REST route was not registered.' );
@@ -188,6 +204,7 @@ try {
 		array(
 			'http_delivery'       => 'success_and_fail_closed',
 			'native_delivery'     => array( 'brevo', 'resend' ),
+			'provider_diagnostics' => array( 'http_api', 'brevo', 'resend', 'external_filter' ),
 			'idempotency'         => 'stable_delivery_and_webhook_replay',
 			'webhook_signature'   => 'hmac_timestamp_validated',
 			'suppression'         => 'complaint_applied_and_queue_cancelled',

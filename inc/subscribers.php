@@ -15,9 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param string $status Result status.
  * @return string
  */
-function newsletter_campaign_kit_get_redirect_url( $status ) {
+function newsletter_campaign_kit_get_redirect_url( $status, $requested_url = '' ) {
 	$referer = wp_get_referer();
-	$url     = $referer ? $referer : home_url( '/' );
+	$url     = wp_validate_redirect( esc_url_raw( $requested_url ), '' );
+	if ( '' === $url ) {
+		$url = wp_validate_redirect( $referer, home_url( '/' ) );
+	}
 
 	return add_query_arg( 'newsletter', sanitize_key( $status ), $url );
 }
@@ -291,18 +294,20 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
  * Handle public newsletter subscription submissions.
  */
 function newsletter_campaign_kit_handle_subscribe() {
+	$return_url = isset( $_POST['newsletter_return_url'] ) ? esc_url_raw( wp_unslash( $_POST['newsletter_return_url'] ) ) : '';
 	if ( ! isset( $_POST['newsletter_campaign_kit_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['newsletter_campaign_kit_nonce'] ) ), 'newsletter_campaign_kit_subscribe' ) ) {
-		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( 'security_failed' ) );
+		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( 'security_failed', $return_url ) );
 		exit;
 	}
 
 	if ( empty( $_POST['newsletter_consent'] ) ) {
-		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( 'consent_required' ) );
+		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( 'consent_required', $return_url ) );
 		exit;
 	}
 
 	$email        = isset( $_POST['newsletter_email'] ) ? sanitize_email( wp_unslash( $_POST['newsletter_email'] ) ) : '';
 	$source       = isset( $_POST['newsletter_source'] ) ? sanitize_key( wp_unslash( $_POST['newsletter_source'] ) ) : 'front_footer';
+	$topic_ids    = isset( $_POST['newsletter_topic_ids'] ) && is_array( $_POST['newsletter_topic_ids'] ) ? array_map( 'absint', wp_unslash( $_POST['newsletter_topic_ids'] ) ) : array();
 	$consent_text = apply_filters( 'newsletter_campaign_kit_consent_text', __( 'I agree to receive editorial updates.', 'newsletter-campaign-kit' ), $source );
 	$settings     = newsletter_campaign_kit_get_provider_settings();
 	$rate_limited = function_exists( 'newsletter_campaign_kit_public_subscription_rate_limit' ) && ! newsletter_campaign_kit_public_subscription_rate_limit( $email, $settings );
@@ -319,11 +324,16 @@ function newsletter_campaign_kit_handle_subscribe() {
 		}
 		// Do not expose suppression-list membership through the public response.
 		$public_status = in_array( $error_code, array( 'email_suppressed', 'subscription_rate_limited' ), true ) ? 'confirmation_required' : $error_code;
-		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( $public_status ) );
+		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( $public_status, $return_url ) );
 		exit;
 	}
 
-	wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( ! empty( $settings['double_opt_in_enabled'] ) ? 'confirmation_required' : 'subscribed' ) );
+	$subscriber = newsletter_campaign_kit_get_subscriber_by_email( $email );
+	if ( $subscriber && function_exists( 'newsletter_campaign_kit_set_initial_topic_preferences' ) ) {
+		newsletter_campaign_kit_set_initial_topic_preferences( $subscriber['id'], $topic_ids );
+	}
+
+	wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( ! empty( $settings['double_opt_in_enabled'] ) ? 'confirmation_required' : 'subscribed', $return_url ) );
 	exit;
 }
 add_action( 'admin_post_nopriv_newsletter_campaign_kit_subscribe', 'newsletter_campaign_kit_handle_subscribe' );

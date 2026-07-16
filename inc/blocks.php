@@ -247,7 +247,7 @@ function newsletter_campaign_kit_render_blocks_page() {
 		<p><?php esc_html_e( 'Build reusable fragments that can be inserted into any campaign without replacing its full template.', 'newsletter-campaign-kit' ); ?></p>
 		<section class="nck-panel">
 			<h2><?php echo esc_html( $editing ? __( 'Edit block', 'newsletter-campaign-kit' ) : __( 'Create a reusable block', 'newsletter-campaign-kit' ) ); ?></h2>
-			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 				<input type="hidden" name="action" value="newsletter_campaign_kit_save_block"><input type="hidden" name="block_id" value="<?php echo esc_attr( $form['id'] ); ?>">
 				<?php wp_nonce_field( 'newsletter_campaign_kit_save_block_' . absint( $form['id'] ) ); ?>
 				<p><label><?php esc_html_e( 'Block name', 'newsletter-campaign-kit' ); ?><br><input class="regular-text" name="block_name" maxlength="190" required value="<?php echo esc_attr( $form['name'] ); ?>"></label></p>

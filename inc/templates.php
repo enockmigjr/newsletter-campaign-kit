@@ -393,7 +393,7 @@ function newsletter_campaign_kit_render_templates_page() {
 		<h1><?php esc_html_e( 'Email templates', 'newsletter-campaign-kit' ); ?></h1>
 		<section class="nck-panel">
 			<h2><?php echo esc_html( $editing ? __( 'Edit template', 'newsletter-campaign-kit' ) : __( 'Create a reusable template', 'newsletter-campaign-kit' ) ); ?></h2>
-			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 				<input type="hidden" name="action" value="newsletter_campaign_kit_save_template">
 				<input type="hidden" name="template_id" value="<?php echo esc_attr( $form['id'] ); ?>">
 				<?php wp_nonce_field( 'newsletter_campaign_kit_save_template_' . absint( $form['id'] ) ); ?>

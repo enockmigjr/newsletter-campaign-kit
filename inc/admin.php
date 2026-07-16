@@ -76,6 +76,7 @@ function newsletter_campaign_kit_enqueue_admin_assets( $hook_suffix ) {
 		array(),
 		NEWSLETTER_CAMPAIGN_KIT_VERSION
 	);
+	wp_enqueue_script( 'newsletter-campaign-kit-admin', NEWSLETTER_CAMPAIGN_KIT_URL . 'assets/js/admin.js', array(), NEWSLETTER_CAMPAIGN_KIT_VERSION, true );
 }
 add_action( 'admin_enqueue_scripts', 'newsletter_campaign_kit_enqueue_admin_assets' );
 

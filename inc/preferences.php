@@ -53,6 +53,16 @@ function newsletter_campaign_kit_get_subscriber_topic_preferences( $subscriber_i
 
 /** Persist a complete set of topic choices for one subscriber. */
 function newsletter_campaign_kit_set_topic_preferences( $subscriber_id, $selected_topic_ids ) {
+	return newsletter_campaign_kit_store_topic_preferences( $subscriber_id, $selected_topic_ids, array( 'subscribed' ) );
+}
+
+/** Store the choices made on a subscription form before double opt-in completes. */
+function newsletter_campaign_kit_set_initial_topic_preferences( $subscriber_id, $selected_topic_ids ) {
+	return newsletter_campaign_kit_store_topic_preferences( $subscriber_id, $selected_topic_ids, array( 'pending', 'subscribed' ) );
+}
+
+/** Persist a complete set of choices for explicitly allowed subscription states. */
+function newsletter_campaign_kit_store_topic_preferences( $subscriber_id, $selected_topic_ids, $allowed_statuses ) {
 	global $wpdb;
 
 	$subscriber_id     = absint( $subscriber_id );
@@ -63,7 +73,8 @@ function newsletter_campaign_kit_set_topic_preferences( $subscriber_id, $selecte
 		return new WP_Error( 'newsletter_preferences_unavailable', __( 'Preferences could not be saved.', 'newsletter-campaign-kit' ) );
 	}
 	$subscriber_status = $wpdb->get_var( $wpdb->prepare( 'SELECT status FROM ' . newsletter_campaign_kit_get_subscribers_table() . ' WHERE id = %d LIMIT 1', $subscriber_id ) );
-	if ( 'subscribed' !== $subscriber_status ) {
+	$allowed_statuses = array_values( array_intersect( array( 'pending', 'subscribed' ), array_map( 'sanitize_key', (array) $allowed_statuses ) ) );
+	if ( ! in_array( $subscriber_status, $allowed_statuses, true ) ) {
 		return new WP_Error( 'newsletter_preferences_not_subscribed', __( 'Preferences are unavailable for this subscription.', 'newsletter-campaign-kit' ) );
 	}
 
@@ -178,15 +189,20 @@ function newsletter_campaign_kit_render_preferences_document( $subscriber, $stat
 	}
 	$topics = $subscriber ? newsletter_campaign_kit_get_subscriber_topic_preferences( $subscriber['id'] ) : array();
 	$token  = $subscriber['unsubscribe_token'] ?? '';
+	$return_url = home_url( '/' );
+	if ( is_user_logged_in() && $subscriber && strtolower( wp_get_current_user()->user_email ) === strtolower( $subscriber['email'] ) ) {
+		$return_url = add_query_arg( 'section', 'newsletter', home_url( '/dashboard/' ) );
+	}
 	?><!doctype html>
 	<html <?php language_attributes(); ?>>
 	<head>
 		<meta charset="<?php bloginfo( 'charset' ); ?>">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title><?php esc_html_e( 'Newsletter preferences', 'newsletter-campaign-kit' ); ?></title>
-		<style>body{margin:0;background:#f4f5f7;color:#17191c;font:16px/1.55 system-ui,sans-serif}.screen-reader-text{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.nck-preferences{box-sizing:border-box;max-width:720px;margin:8vh auto;padding:32px;background:#fff;border:1px solid #d9dde3;border-radius:8px}.nck-preferences h1{font:600 32px/1.2 Georgia,serif;margin:0 0 12px}.nck-preferences fieldset{border:0;margin:28px 0;padding:0}.nck-topic{display:grid;grid-template-columns:24px 1fr;gap:8px 12px;padding:16px 0;border-top:1px solid #e5e7eb}.nck-topic input{margin-top:5px}.nck-topic small{grid-column:2;color:#626871}.nck-actions{display:flex;gap:12px;flex-wrap:wrap}.nck-button{border:1px solid #17191c;border-radius:4px;background:#17191c;color:#fff;cursor:pointer;padding:10px 16px;font:inherit}.nck-button-secondary{background:#fff;color:#17191c}.nck-notice{border-left:4px solid #238636;background:#f0faf3;padding:12px 16px}@media(max-width:760px){.nck-preferences{margin:0;min-height:100vh;border:0;border-radius:0;padding:24px}}</style>
+		<style>body{margin:0;background:#f4f5f7;color:#17191c;font:16px/1.55 system-ui,sans-serif}.screen-reader-text{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.nck-preferences{box-sizing:border-box;max-width:720px;margin:8vh auto;padding:32px;background:#fff;border:1px solid #d9dde3;border-radius:8px}.nck-back{display:inline-block;margin-bottom:24px;color:#3f454d;text-decoration:none}.nck-back:hover{text-decoration:underline}.nck-preferences h1{font:600 32px/1.2 Georgia,serif;margin:0 0 12px}.nck-preferences fieldset{border:0;margin:28px 0;padding:0}.nck-topic{display:grid;grid-template-columns:24px 1fr;gap:8px 12px;padding:16px 0;border-top:1px solid #e5e7eb}.nck-topic input{margin-top:5px}.nck-topic small{grid-column:2;color:#626871}.nck-actions{display:flex;gap:12px;flex-wrap:wrap}.nck-button{border:1px solid #17191c;border-radius:4px;background:#17191c;color:#fff;cursor:pointer;padding:10px 16px;font:inherit}.nck-button-secondary{background:#fff;color:#17191c}.nck-notice{border-left:4px solid #238636;background:#f0faf3;padding:12px 16px}@media(max-width:760px){.nck-preferences{margin:0;min-height:100vh;border:0;border-radius:0;padding:24px}}</style>
 	</head>
 	<body><main class="nck-preferences">
+		<a class="nck-back" href="<?php echo esc_url( $return_url ); ?>">&larr; <?php esc_html_e( 'Back to PhotoVault', 'newsletter-campaign-kit' ); ?></a>
 		<h1><?php esc_html_e( 'Newsletter preferences', 'newsletter-campaign-kit' ); ?></h1>
 		<?php if ( ! $subscriber ) : ?>
 			<p><?php esc_html_e( 'This preference link is invalid or has expired.', 'newsletter-campaign-kit' ); ?></p>

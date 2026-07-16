@@ -59,6 +59,9 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
 - Integrer les exports, effacements et le guide de confidentialite natifs de WordPress.
 - Exposer aux integrations serveur l'abonnement correspondant a l'e-mail du compte, sans endpoint public de recherche.
+- Capturer plusieurs thematiques depuis le formulaire d'inscription et conserver les choix pendant le double opt-in.
+- Reutiliser un article publie comme campagne, manuellement ou selon un mode automatique explicite, sans recopier titre, image, extrait ni contenu.
+- Prevenir les doubles soumissions sur les ecrans admin et paginer toutes les listes operationnelles.
 
 ## Capabilities
 
@@ -103,6 +106,25 @@ Les options d'etat scheduler/maintenance ne contiennent que dates, duree, statut
 Les reglages provider contiennent aussi les drapeaux `one_click_enabled` et `dkim_confirmed`. Les en-tetes RFC 8058 ne sont emis que lorsque les deux sont actifs et que l'URL publique est en HTTPS. La signature DKIM doit couvrir `List-Unsubscribe` et `List-Unsubscribe-Post`; le plugin exige une confirmation explicite car `wp_mail()` ne permet pas de prouver cette couverture avant remise au transport.
 
 Le provider HTTP lit `NEWSLETTER_CAMPAIGN_KIT_HTTP_ENDPOINT`, `NEWSLETTER_CAMPAIGN_KIT_HTTP_API_KEY`, `NEWSLETTER_CAMPAIGN_KIT_WEBHOOK_SECRET` et, facultativement, `NEWSLETTER_CAMPAIGN_KIT_HTTP_TIMEOUT`. Ces valeurs doivent etre injectees par `wp-config.php`, l'environnement ou le filtre `newsletter_campaign_kit_http_provider_config`; elles ne sont jamais stockees dans les options.
+
+### Ou placer les cles
+
+Le provider se choisit dans Newsletter Kit > Settings. Placer les constantes dans wp-config.php avant la ligne de fin d'edition, ou injecter les memes noms comme variables d'environnement du conteneur PHP.
+
+```php
+// Brevo, recommande.
+define( 'NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY', 'xkeysib-...' );
+
+// Ou Resend.
+define( 'NEWSLETTER_CAMPAIGN_KIT_RESEND_API_KEY', 're_...' );
+
+// Adaptateur HTTP generique.
+define( 'NEWSLETTER_CAMPAIGN_KIT_HTTP_ENDPOINT', 'https://provider.example/v1/send' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_HTTP_API_KEY', '...' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_WEBHOOK_SECRET', '...' );
+```
+
+Ne committer aucune valeur reelle. La page Settings indique si les cles du provider selectionne sont detectees.
 
 Les reglages publics bornent `double_opt_in_enabled`, la validite du lien (1-168 heures), le cooldown (1-1440 minutes), les tentatives (1-30) et leur fenetre (1-1440 minutes). Le token brut n'est present que dans l'email; la table abonnes conserve son HMAC, l'expiration, la date d'envoi et la date de confirmation.
 
@@ -200,11 +222,9 @@ La suppression Privacy conserve seulement le HMAC d'une adresse lorsqu'une suppr
 
 ## Reste majeur
 
-- Export avance des listes, tags et segments (l'import CSV des abonnes et de leurs affectations est operationnel).
-- Adaptateurs supplementaires (Mailgun, Postmark ou SES) uniquement si le fournisseur d'hebergement retenu l'exige; Brevo et Resend sont deja natifs.
-- Validation en staging avec un domaine expediteur, DKIM et identifiants reels du fournisseur retenu.
-- Alertes externes, metriques provider et supervision distribuee des confirmations/abus lorsque l'hebergeur final est connu.
-- Tracking ouvertures/clics avec consentement et statistiques associees.
+- Validation en staging avec un domaine expediteur, DKIM et identifiants Brevo ou Resend reels.
+- Alertes externes et metriques provider lorsque l'hebergeur final est connu.
+- Tracking ouvertures/clics uniquement apres decision de consentement et de mesure.
 
 ## References officielles
 

@@ -297,22 +297,22 @@ function newsletter_campaign_kit_render_segments_page() {
 		<div class="nck-layout">
 			<section class="nck-panel">
 				<h2><?php esc_html_e( 'Create list', 'newsletter-campaign-kit' ); ?></h2>
-				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 					<input type="hidden" name="action" value="newsletter_campaign_kit_create_list">
 					<?php wp_nonce_field( 'newsletter_campaign_kit_create_list' ); ?>
-					<p><input class="regular-text" name="list_name" required maxlength="120" placeholder="<?php esc_attr_e( 'Collectors, clients, public journal...', 'newsletter-campaign-kit' ); ?>"></p>
-					<p><textarea class="large-text" name="list_description" rows="3" placeholder="<?php esc_attr_e( 'Audience intent and editorial use.', 'newsletter-campaign-kit' ); ?>"></textarea></p>
+					<p><label for="nck-list-name"><?php esc_html_e( 'List name', 'newsletter-campaign-kit' ); ?><input id="nck-list-name" class="regular-text" name="list_name" required maxlength="120" placeholder="<?php esc_attr_e( 'Collectors, clients, public journal...', 'newsletter-campaign-kit' ); ?>"></label></p>
+					<p><label for="nck-list-description"><?php esc_html_e( 'Description', 'newsletter-campaign-kit' ); ?><textarea id="nck-list-description" class="large-text" name="list_description" rows="3" placeholder="<?php esc_attr_e( 'Audience intent and editorial use.', 'newsletter-campaign-kit' ); ?>"></textarea></label></p>
 					<?php submit_button( __( 'Create list', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 				</form>
 			</section>
 
 			<section class="nck-panel">
 				<h2><?php esc_html_e( 'Create tag', 'newsletter-campaign-kit' ); ?></h2>
-				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 					<input type="hidden" name="action" value="newsletter_campaign_kit_create_tag">
 					<?php wp_nonce_field( 'newsletter_campaign_kit_create_tag' ); ?>
-					<p><input class="regular-text" name="tag_name" required maxlength="80" placeholder="<?php esc_attr_e( 'Portrait, private access, collector...', 'newsletter-campaign-kit' ); ?>"></p>
-					<p><input type="color" name="tag_color" value="#111827"></p>
+					<p><label for="nck-tag-name"><?php esc_html_e( 'Tag name', 'newsletter-campaign-kit' ); ?><input id="nck-tag-name" class="regular-text" name="tag_name" required maxlength="80" placeholder="<?php esc_attr_e( 'Portrait, private access, collector...', 'newsletter-campaign-kit' ); ?>"></label></p>
+					<p><label for="nck-tag-color"><?php esc_html_e( 'Tag color', 'newsletter-campaign-kit' ); ?><input id="nck-tag-color" type="color" name="tag_color" value="#111827"></label></p>
 					<?php submit_button( __( 'Create tag', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 				</form>
 			</section>
@@ -343,7 +343,7 @@ function newsletter_campaign_kit_render_segments_page() {
 		<div class="nck-layout">
 			<section class="nck-panel">
 				<h2><?php echo esc_html( $editing ? __( 'Edit dynamic segment', 'newsletter-campaign-kit' ) : __( 'Create dynamic segment', 'newsletter-campaign-kit' ) ); ?></h2>
-				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 					<input type="hidden" name="action" value="<?php echo esc_attr( $editing ? 'newsletter_campaign_kit_update_segment' : 'newsletter_campaign_kit_create_segment' ); ?>">
 					<?php if ( $editing ) : ?><input type="hidden" name="segment_id" value="<?php echo esc_attr( $editing['id'] ); ?>"><?php endif; ?>
 					<?php wp_nonce_field( $editing ? 'newsletter_campaign_kit_update_segment_' . absint( $editing['id'] ) : 'newsletter_campaign_kit_create_segment' ); ?>
@@ -380,12 +380,12 @@ function newsletter_campaign_kit_render_segments_page() {
 
 			<section class="nck-panel">
 				<h2><?php esc_html_e( 'Create campaign topic', 'newsletter-campaign-kit' ); ?></h2>
-				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 					<input type="hidden" name="action" value="newsletter_campaign_kit_create_topic">
 					<?php wp_nonce_field( 'newsletter_campaign_kit_create_topic' ); ?>
-					<p><input class="regular-text" name="topic_name" required maxlength="100" placeholder="<?php esc_attr_e( 'Portraits, exhibitions, private archives...', 'newsletter-campaign-kit' ); ?>"></p>
-					<p><textarea class="large-text" name="topic_description" rows="3" placeholder="<?php esc_attr_e( 'Editorial scope of this topic.', 'newsletter-campaign-kit' ); ?>"></textarea></p>
-					<p><input type="color" name="topic_color" value="#111827"></p>
+					<p><label for="nck-topic-name"><?php esc_html_e( 'Topic name', 'newsletter-campaign-kit' ); ?><input id="nck-topic-name" class="regular-text" name="topic_name" required maxlength="100" placeholder="<?php esc_attr_e( 'Portraits, exhibitions, private archives...', 'newsletter-campaign-kit' ); ?>"></label></p>
+					<p><label for="nck-topic-description"><?php esc_html_e( 'Description', 'newsletter-campaign-kit' ); ?><textarea id="nck-topic-description" class="large-text" name="topic_description" rows="3" placeholder="<?php esc_attr_e( 'Editorial scope of this topic.', 'newsletter-campaign-kit' ); ?>"></textarea></label></p>
+					<p><label for="nck-topic-color"><?php esc_html_e( 'Topic color', 'newsletter-campaign-kit' ); ?><input id="nck-topic-color" type="color" name="topic_color" value="#111827"></label></p>
 					<?php submit_button( __( 'Create topic', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 				</form>
 			</section>

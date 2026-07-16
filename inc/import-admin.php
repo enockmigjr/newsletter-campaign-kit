@@ -72,17 +72,13 @@ function newsletter_campaign_kit_render_import_page() {
 			<?php foreach ( array_slice( $report['rows'], 0, 100 ) as $row ) : ?><tr><td><?php echo esc_html( $row['line'] ); ?></td><td><?php echo esc_html( $row['status'] ); ?></td><td><?php echo esc_html( $row['action'] ); ?></td><td><?php echo esc_html( $row['message'] ); ?></td></tr><?php endforeach; ?>
 			</tbody></table>
 		<?php endif; ?>
-		<form method="POST" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-panel" style="max-width:900px;margin-top:20px">
+		<form method="POST" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-panel nck-form-table">
 			<input type="hidden" name="action" value="newsletter_campaign_kit_import_csv">
 			<?php wp_nonce_field( 'newsletter_campaign_kit_import_csv' ); ?>
 			<table class="form-table"><tbody>
 			<tr><th><label for="newsletter_csv"><?php esc_html_e( 'CSV file', 'newsletter-campaign-kit' ); ?></label></th><td><input id="newsletter_csv" type="file" name="newsletter_csv" accept=".csv,text/csv" required><p class="description"><?php echo esc_html( sprintf( __( 'Maximum %1$d MB and %2$d data rows.', 'newsletter-campaign-kit' ), newsletter_campaign_kit_import_max_bytes() / MB_IN_BYTES, newsletter_campaign_kit_import_max_rows() ) ); ?></p></td></tr>
 			<tr><th><?php esc_html_e( 'Header mapping', 'newsletter-campaign-kit' ); ?></th><td>
-				<label><?php esc_html_e( 'Email', 'newsletter-campaign-kit' ); ?> <input name="map_email" value="email" required></label><br>
-				<label><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?> <input name="map_status" value="status"></label><br>
-				<label><?php esc_html_e( 'Lists', 'newsletter-campaign-kit' ); ?> <input name="map_lists" value="lists"></label><br>
-				<label><?php esc_html_e( 'Tags', 'newsletter-campaign-kit' ); ?> <input name="map_tags" value="tags"></label><br>
-				<label><?php esc_html_e( 'Consent', 'newsletter-campaign-kit' ); ?> <input name="map_consent" value="consent_text"></label>
+				<div class="nck-mapping-grid"><label><?php esc_html_e( 'Email', 'newsletter-campaign-kit' ); ?><input name="map_email" value="email" required></label><label><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?><input name="map_status" value="status"></label><label><?php esc_html_e( 'Lists', 'newsletter-campaign-kit' ); ?><input name="map_lists" value="lists"></label><label><?php esc_html_e( 'Tags', 'newsletter-campaign-kit' ); ?><input name="map_tags" value="tags"></label><label><?php esc_html_e( 'Consent', 'newsletter-campaign-kit' ); ?><input name="map_consent" value="consent_text"></label></div>
 			</td></tr>
 			<tr><th><label for="default_status"><?php esc_html_e( 'Default status', 'newsletter-campaign-kit' ); ?></label></th><td><select id="default_status" name="default_status"><option value="subscribed"><?php esc_html_e( 'Subscribed', 'newsletter-campaign-kit' ); ?></option><option value="unsubscribed"><?php esc_html_e( 'Unsubscribed', 'newsletter-campaign-kit' ); ?></option></select></td></tr>
 			<tr><th><label for="default_consent"><?php esc_html_e( 'Default consent evidence', 'newsletter-campaign-kit' ); ?></label></th><td><textarea id="default_consent" name="default_consent" class="large-text" rows="3"></textarea><p class="description"><?php esc_html_e( 'Required for new or reactivated active subscriptions when the mapped cell is empty.', 'newsletter-campaign-kit' ); ?></p></td></tr>

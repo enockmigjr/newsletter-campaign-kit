@@ -762,14 +762,14 @@ function newsletter_campaign_kit_render_campaigns_page() {
 
 		<section class="nck-panel">
 			<h2><?php echo esc_html( $editing ? __( 'Edit campaign draft', 'newsletter-campaign-kit' ) : __( 'Create campaign draft', 'newsletter-campaign-kit' ) ); ?></h2>
-			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 				<input type="hidden" name="action" value="<?php echo esc_attr( $editing ? 'newsletter_campaign_kit_update_campaign' : 'newsletter_campaign_kit_create_campaign' ); ?>">
 				<?php if ( $editing ) : ?><input type="hidden" name="campaign_id" value="<?php echo esc_attr( $editing['id'] ); ?>"><?php endif; ?>
 				<?php wp_nonce_field( $editing ? 'newsletter_campaign_kit_update_campaign_' . absint( $editing['id'] ) : 'newsletter_campaign_kit_create_campaign' ); ?>
-				<p><input class="regular-text" name="campaign_title" required maxlength="190" value="<?php echo esc_attr( $editing ? $editing['title'] : '' ); ?>" placeholder="<?php esc_attr_e( 'July visual letter', 'newsletter-campaign-kit' ); ?>"></p>
+				<p><label for="nck-campaign-title"><?php esc_html_e( 'Internal campaign title', 'newsletter-campaign-kit' ); ?><input id="nck-campaign-title" class="regular-text" name="campaign_title" required maxlength="190" value="<?php echo esc_attr( $editing ? $editing['title'] : '' ); ?>" placeholder="<?php esc_attr_e( 'July visual letter', 'newsletter-campaign-kit' ); ?>"></label></p>
 				<p><label for="nck-template-id"><?php esc_html_e( 'Start from a template', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-template-id" name="template_id"><option value="0"><?php esc_html_e( 'No template', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $templates as $template ) : ?><option value="<?php echo esc_attr( $template['id'] ); ?>" <?php selected( $editing ? (int) $editing['template_id'] : $default_template_id, (int) $template['id'] ); ?>><?php echo esc_html( $template['name'] ); ?></option><?php endforeach; ?></select></p>
-				<p><input class="regular-text" name="campaign_subject" maxlength="190" value="<?php echo esc_attr( $editing ? $editing['subject'] : '' ); ?>" placeholder="<?php esc_attr_e( 'Subject override (optional with a template)', 'newsletter-campaign-kit' ); ?>"></p>
-				<p><input class="large-text" name="campaign_preview_text" maxlength="255" value="<?php echo esc_attr( $editing ? $editing['preview_text'] : '' ); ?>" placeholder="<?php esc_attr_e( 'Short inbox preview text.', 'newsletter-campaign-kit' ); ?>"></p>
+				<p><label for="nck-campaign-subject"><?php esc_html_e( 'Email subject', 'newsletter-campaign-kit' ); ?><input id="nck-campaign-subject" class="regular-text" name="campaign_subject" maxlength="190" value="<?php echo esc_attr( $editing ? $editing['subject'] : '' ); ?>" placeholder="<?php esc_attr_e( 'Subject override (optional with a template)', 'newsletter-campaign-kit' ); ?>"></label></p>
+				<p><label for="nck-campaign-preview"><?php esc_html_e( 'Inbox preview', 'newsletter-campaign-kit' ); ?><input id="nck-campaign-preview" class="large-text" name="campaign_preview_text" maxlength="255" value="<?php echo esc_attr( $editing ? $editing['preview_text'] : '' ); ?>" placeholder="<?php esc_attr_e( 'Short inbox preview text.', 'newsletter-campaign-kit' ); ?>"></label></p>
 				<p>
 					<label class="screen-reader-text" for="nck-target-audience"><?php esc_html_e( 'Campaign audience', 'newsletter-campaign-kit' ); ?></label>
 					<select id="nck-target-audience" name="target_audience">
@@ -798,8 +798,8 @@ function newsletter_campaign_kit_render_campaigns_page() {
 						<button class="button" type="button" data-newsletter-insert-block><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span> <?php esc_html_e( 'Insert block', 'newsletter-campaign-kit' ); ?></button>
 					</div>
 				<?php endif; ?>
-				<p><textarea id="nck-campaign-html-body" class="large-text" name="campaign_body" rows="8" placeholder="<?php esc_attr_e( 'Editorial body. Basic safe HTML is allowed.', 'newsletter-campaign-kit' ); ?>"><?php echo esc_textarea( $editing ? $editing['body'] : '' ); ?></textarea></p>
-				<p><textarea id="nck-campaign-text-body" class="large-text code" name="campaign_text_body" rows="6" placeholder="<?php esc_attr_e( 'Plain-text version. Generated from HTML when left empty.', 'newsletter-campaign-kit' ); ?>"><?php echo esc_textarea( $editing ? $editing['text_body'] : '' ); ?></textarea></p>
+				<p><label for="nck-campaign-html-body"><?php esc_html_e( 'HTML body', 'newsletter-campaign-kit' ); ?><textarea id="nck-campaign-html-body" class="large-text" name="campaign_body" rows="8" placeholder="<?php esc_attr_e( 'Editorial body. Basic safe HTML is allowed.', 'newsletter-campaign-kit' ); ?>"><?php echo esc_textarea( $editing ? $editing['body'] : '' ); ?></textarea></label></p>
+				<p><label for="nck-campaign-text-body"><?php esc_html_e( 'Plain-text body', 'newsletter-campaign-kit' ); ?><textarea id="nck-campaign-text-body" class="large-text code" name="campaign_text_body" rows="6" placeholder="<?php esc_attr_e( 'Plain-text version. Generated from HTML when left empty.', 'newsletter-campaign-kit' ); ?>"><?php echo esc_textarea( $editing ? $editing['text_body'] : '' ); ?></textarea></label></p>
 				<?php submit_button( $editing ? __( 'Save draft', 'newsletter-campaign-kit' ) : __( 'Create draft', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 				<?php if ( $editing ) : ?><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns' ) ); ?>"><?php esc_html_e( 'Cancel editing', 'newsletter-campaign-kit' ); ?></a><?php endif; ?>
 			</form>

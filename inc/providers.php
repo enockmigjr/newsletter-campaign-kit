@@ -27,6 +27,8 @@ function newsletter_campaign_kit_get_provider_defaults() {
 		'queue_batch_size'                  => 20,
 		'pending_retention_days'            => 7,
 		'cron_late_after_minutes'           => 5,
+		'post_newsletter_mode'              => 'disabled',
+		'post_newsletter_topic_id'          => 0,
 	);
 }
 
@@ -50,6 +52,11 @@ function newsletter_campaign_kit_get_provider_settings() {
 	$settings['queue_batch_size']                 = max( 1, min( 100, absint( $settings['queue_batch_size'] ) ) );
 	$settings['pending_retention_days']           = max( 1, min( 90, absint( $settings['pending_retention_days'] ) ) );
 	$settings['cron_late_after_minutes']          = max( 2, min( 60, absint( $settings['cron_late_after_minutes'] ) ) );
+	$settings['post_newsletter_mode']             = in_array( $settings['post_newsletter_mode'], array( 'disabled', 'draft', 'send' ), true ) ? $settings['post_newsletter_mode'] : 'disabled';
+	$settings['post_newsletter_topic_id']         = absint( $settings['post_newsletter_topic_id'] );
+	if ( $settings['post_newsletter_topic_id'] && function_exists( 'newsletter_campaign_kit_record_is_active' ) && ! newsletter_campaign_kit_record_is_active( newsletter_campaign_kit_get_topics_table(), $settings['post_newsletter_topic_id'] ) ) {
+		$settings['post_newsletter_topic_id'] = 0;
+	}
 
 	return $settings;
 }
@@ -78,6 +85,8 @@ function newsletter_campaign_kit_save_provider_settings() {
 		'queue_batch_size'                 => isset( $_POST['queue_batch_size'] ) ? max( 1, min( 100, absint( $_POST['queue_batch_size'] ) ) ) : 20,
 		'pending_retention_days'           => isset( $_POST['pending_retention_days'] ) ? max( 1, min( 90, absint( $_POST['pending_retention_days'] ) ) ) : 7,
 		'cron_late_after_minutes'          => isset( $_POST['cron_late_after_minutes'] ) ? max( 2, min( 60, absint( $_POST['cron_late_after_minutes'] ) ) ) : 5,
+		'post_newsletter_mode'             => isset( $_POST['post_newsletter_mode'] ) && in_array( sanitize_key( wp_unslash( $_POST['post_newsletter_mode'] ) ), array( 'disabled', 'draft', 'send' ), true ) ? sanitize_key( wp_unslash( $_POST['post_newsletter_mode'] ) ) : 'disabled',
+		'post_newsletter_topic_id'         => isset( $_POST['post_newsletter_topic_id'] ) ? absint( $_POST['post_newsletter_topic_id'] ) : 0,
 	);
 
 	update_option( 'newsletter_campaign_kit_provider_settings', $settings, false );
@@ -113,14 +122,19 @@ function newsletter_campaign_kit_render_settings_page() {
 	$is_https        = 'https' === wp_parse_url( $unsubscribe_url, PHP_URL_SCHEME );
 	$http_status     = function_exists( 'newsletter_campaign_kit_get_http_provider_status' ) ? newsletter_campaign_kit_get_http_provider_status() : array();
 	$native_status   = function_exists( 'newsletter_campaign_kit_get_native_provider_status' ) ? newsletter_campaign_kit_get_native_provider_status() : array();
+	$topics          = function_exists( 'newsletter_campaign_kit_get_topics' ) ? newsletter_campaign_kit_get_topics( 100, 0 ) : array();
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Newsletter settings', 'newsletter-campaign-kit' ); ?></h1>
 		<p><?php esc_html_e( 'Configure the delivery adapter used by the queue. API providers should be connected through the provider filter without storing secrets in this plugin.', 'newsletter-campaign-kit' ); ?></p>
-		<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-panel">
+		<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-panel nck-form-table">
 			<input type="hidden" name="action" value="newsletter_campaign_kit_save_provider_settings">
 			<?php wp_nonce_field( 'newsletter_campaign_kit_save_provider_settings' ); ?>
 			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="post_newsletter_mode"><?php esc_html_e( 'Published articles', 'newsletter-campaign-kit' ); ?></label></th>
+					<td><select id="post_newsletter_mode" name="post_newsletter_mode"><option value="disabled" <?php selected( $settings['post_newsletter_mode'], 'disabled' ); ?>><?php esc_html_e( 'Manual only', 'newsletter-campaign-kit' ); ?></option><option value="draft" <?php selected( $settings['post_newsletter_mode'], 'draft' ); ?>><?php esc_html_e( 'Create a campaign draft on publish', 'newsletter-campaign-kit' ); ?></option><option value="send" <?php selected( $settings['post_newsletter_mode'], 'send' ); ?>><?php esc_html_e( 'Queue automatically on publish', 'newsletter-campaign-kit' ); ?></option></select><p class="description"><?php esc_html_e( 'Editors can always create a campaign draft from the Article panel. Automatic delivery uses the frozen eligible audience and the configured provider.', 'newsletter-campaign-kit' ); ?></p><p><label for="post_newsletter_topic_id"><?php esc_html_e( 'Default topic', 'newsletter-campaign-kit' ); ?> <select id="post_newsletter_topic_id" name="post_newsletter_topic_id"><option value="0"><?php esc_html_e( 'No topic', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $topics as $topic ) : ?><option value="<?php echo esc_attr( $topic['id'] ); ?>" <?php selected( $settings['post_newsletter_topic_id'], $topic['id'] ); ?>><?php echo esc_html( $topic['name'] ); ?></option><?php endforeach; ?></select></label></p></td>
+				</tr>
 				<tr>
 					<th scope="row"><label for="provider"><?php esc_html_e( 'Provider', 'newsletter-campaign-kit' ); ?></label></th>
 					<td>

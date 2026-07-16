@@ -233,7 +233,11 @@ function newsletter_campaign_kit_confirm_subscription( $token ) {
 function newsletter_campaign_kit_handle_subscription_confirmation() {
 	$token  = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
 	$result = newsletter_campaign_kit_confirm_subscription( $token );
-	wp_safe_redirect( add_query_arg( 'newsletter', is_wp_error( $result ) ? 'confirmation_invalid' : 'confirmed', home_url( '/' ) ) );
+	$target = home_url( '/' );
+	if ( ! is_wp_error( $result ) && is_user_logged_in() ) {
+		$target = add_query_arg( 'section', 'newsletter', home_url( '/dashboard/' ) );
+	}
+	wp_safe_redirect( add_query_arg( 'newsletter', is_wp_error( $result ) ? 'confirmation_invalid' : 'confirmed', $target ) );
 	exit;
 }
 add_action( 'admin_post_nopriv_newsletter_campaign_kit_confirm_subscription', 'newsletter_campaign_kit_handle_subscription_confirmation' );

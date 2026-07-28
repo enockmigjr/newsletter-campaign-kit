@@ -20,13 +20,7 @@ function newsletter_campaign_kit_hash_confirmation_token( $token ) {
 }
 
 function newsletter_campaign_kit_get_confirmation_url( $token ) {
-	return add_query_arg(
-		array(
-			'action' => 'newsletter_campaign_kit_confirm_subscription',
-			'token'  => sanitize_text_field( $token ),
-		),
-		admin_url( 'admin-post.php' )
-	);
+	return add_query_arg( 'token', sanitize_text_field( $token ), home_url( '/newsletter/confirm/' ) );
 }
 
 /** Return independent network and address buckets without exposing either value. */

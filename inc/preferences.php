@@ -11,13 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /** Build a public preference-center URL from an opaque subscriber token. */
 function newsletter_campaign_kit_get_preferences_url( $token ) {
-	return add_query_arg(
-		array(
-			'action' => 'newsletter_campaign_kit_preferences',
-			'token'  => sanitize_text_field( $token ),
-		),
-		admin_url( 'admin-post.php' )
-	);
+	return add_query_arg( 'token', sanitize_text_field( $token ), home_url( '/newsletter/preferences/' ) );
 }
 
 /** Find the minimal subscriber record authorized by a valid opaque token. */
@@ -212,8 +206,8 @@ function newsletter_campaign_kit_render_preferences_document( $subscriber, $stat
 			<?php if ( 'updated' === $status ) : ?><p class="nck-notice"><?php esc_html_e( 'Your preferences were saved.', 'newsletter-campaign-kit' ); ?></p><?php endif; ?>
 			<?php if ( 'failed' === $status ) : ?><p class="nck-notice"><?php esc_html_e( 'Your preferences could not be saved. Please try again.', 'newsletter-campaign-kit' ); ?></p><?php endif; ?>
 			<p><?php esc_html_e( 'Choose the editorial themes you want to receive. Campaigns without a theme may still be delivered while the global subscription remains active.', 'newsletter-campaign-kit' ); ?></p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<input type="hidden" name="action" value="newsletter_campaign_kit_update_preferences">
+			<form method="post" action="<?php echo esc_url( newsletter_campaign_kit_get_preferences_url( $token ) ); ?>">
+				<input type="hidden" name="newsletter_intent" value="update_preferences">
 				<input type="hidden" name="token" value="<?php echo esc_attr( $token ); ?>">
 				<?php wp_nonce_field( 'newsletter_campaign_kit_preferences_' . $token ); ?>
 				<fieldset><legend class="screen-reader-text"><?php esc_html_e( 'Editorial themes', 'newsletter-campaign-kit' ); ?></legend>
@@ -221,8 +215,8 @@ function newsletter_campaign_kit_render_preferences_document( $subscriber, $stat
 				<?php if ( empty( $topics ) ) : ?><p><?php esc_html_e( 'No thematic preferences are available yet.', 'newsletter-campaign-kit' ); ?></p><?php endif; ?></fieldset>
 				<button class="nck-button" type="submit"><?php esc_html_e( 'Save preferences', 'newsletter-campaign-kit' ); ?></button>
 			</form>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:32px">
-				<input type="hidden" name="action" value="newsletter_campaign_kit_confirm_unsubscribe">
+			<form method="post" action="<?php echo esc_url( newsletter_campaign_kit_get_preferences_url( $token ) ); ?>" style="margin-top:32px">
+				<input type="hidden" name="newsletter_intent" value="confirm_unsubscribe">
 				<input type="hidden" name="token" value="<?php echo esc_attr( $token ); ?>">
 				<?php wp_nonce_field( 'newsletter_campaign_kit_preferences_' . $token ); ?>
 				<button class="nck-button nck-button-secondary" type="submit"><?php esc_html_e( 'Unsubscribe from all newsletters', 'newsletter-campaign-kit' ); ?></button>

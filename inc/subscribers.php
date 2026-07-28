@@ -87,13 +87,7 @@ function newsletter_campaign_kit_is_valid_unsubscribe_token( $token ) {
  * @return string
  */
 function newsletter_campaign_kit_get_unsubscribe_url( $token ) {
-	return add_query_arg(
-		array(
-			'action' => 'newsletter_campaign_kit_unsubscribe',
-			'token'  => sanitize_text_field( $token ),
-		),
-		admin_url( 'admin-post.php' )
-	);
+	return add_query_arg( 'token', sanitize_text_field( $token ), home_url( '/newsletter/unsubscribe/' ) );
 }
 
 /**
@@ -293,23 +287,16 @@ function newsletter_campaign_kit_subscribe_email( $email, $source, $consent_text
 /**
  * Handle public newsletter subscription submissions.
  */
-function newsletter_campaign_kit_handle_subscribe() {
-	$return_url = isset( $_POST['newsletter_return_url'] ) ? esc_url_raw( wp_unslash( $_POST['newsletter_return_url'] ) ) : '';
-	if ( ! isset( $_POST['newsletter_campaign_kit_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['newsletter_campaign_kit_nonce'] ) ), 'newsletter_campaign_kit_subscribe' ) ) {
-		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( 'security_failed', $return_url ) );
-		exit;
-	}
-
-	if ( empty( $_POST['newsletter_consent'] ) ) {
-		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( 'consent_required', $return_url ) );
-		exit;
-	}
-
-	$email        = isset( $_POST['newsletter_email'] ) ? sanitize_email( wp_unslash( $_POST['newsletter_email'] ) ) : '';
-	$source       = isset( $_POST['newsletter_source'] ) ? sanitize_key( wp_unslash( $_POST['newsletter_source'] ) ) : 'front_footer';
-	$topic_ids    = isset( $_POST['newsletter_topic_ids'] ) && is_array( $_POST['newsletter_topic_ids'] ) ? array_map( 'absint', wp_unslash( $_POST['newsletter_topic_ids'] ) ) : array();
+function newsletter_campaign_kit_process_subscription( $values ) {
+	$values       = is_array( $values ) ? $values : array();
+	$email        = sanitize_email( $values['newsletter_email'] ?? '' );
+	$source       = sanitize_key( $values['newsletter_source'] ?? 'front_footer' );
+	$topic_ids    = isset( $values['newsletter_topic_ids'] ) && is_array( $values['newsletter_topic_ids'] ) ? array_map( 'absint', $values['newsletter_topic_ids'] ) : array();
 	$consent_text = apply_filters( 'newsletter_campaign_kit_consent_text', __( 'I agree to receive editorial updates.', 'newsletter-campaign-kit' ), $source );
 	$settings     = newsletter_campaign_kit_get_provider_settings();
+	if ( empty( $values['newsletter_consent'] ) ) {
+		return new WP_Error( 'consent_required', __( 'Consent is required before subscription.', 'newsletter-campaign-kit' ) );
+	}
 	$rate_limited = function_exists( 'newsletter_campaign_kit_public_subscription_rate_limit' ) && ! newsletter_campaign_kit_public_subscription_rate_limit( $email, $settings );
 	$result       = $rate_limited
 		? new WP_Error( 'subscription_rate_limited', __( 'The subscription request could not be processed.', 'newsletter-campaign-kit' ) )
@@ -324,8 +311,13 @@ function newsletter_campaign_kit_handle_subscribe() {
 		}
 		// Do not expose suppression-list membership through the public response.
 		$public_status = in_array( $error_code, array( 'email_suppressed', 'subscription_rate_limited' ), true ) ? 'confirmation_required' : $error_code;
-		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( $public_status, $return_url ) );
-		exit;
+		if ( 'confirmation_required' === $public_status ) {
+			return array(
+				'status'        => 'confirmation_required',
+				'subscriber_id' => 0,
+			);
+		}
+		return new WP_Error( $public_status, 'confirmation_required' === $public_status ? __( 'Check your inbox to continue the subscription.', 'newsletter-campaign-kit' ) : $result->get_error_message() );
 	}
 
 	$subscriber = newsletter_campaign_kit_get_subscriber_by_email( $email );
@@ -333,7 +325,22 @@ function newsletter_campaign_kit_handle_subscribe() {
 		newsletter_campaign_kit_set_initial_topic_preferences( $subscriber['id'], $topic_ids );
 	}
 
-	wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( ! empty( $settings['double_opt_in_enabled'] ) ? 'confirmation_required' : 'subscribed', $return_url ) );
+	return array(
+		'status'        => ! empty( $settings['double_opt_in_enabled'] ) ? 'confirmation_required' : 'subscribed',
+		'subscriber_id' => absint( $subscriber['id'] ?? 0 ),
+	);
+}
+
+function newsletter_campaign_kit_handle_subscribe() {
+	$return_url = isset( $_POST['newsletter_return_url'] ) ? esc_url_raw( wp_unslash( $_POST['newsletter_return_url'] ) ) : '';
+	if ( ! isset( $_POST['newsletter_campaign_kit_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['newsletter_campaign_kit_nonce'] ) ), 'newsletter_campaign_kit_subscribe' ) ) {
+		wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( 'security_failed', $return_url ) );
+		exit;
+	}
+
+	$result = newsletter_campaign_kit_process_subscription( wp_unslash( $_POST ) );
+	$status = is_wp_error( $result ) ? $result->get_error_code() : $result['status'];
+	wp_safe_redirect( newsletter_campaign_kit_get_redirect_url( $status, $return_url ) );
 	exit;
 }
 add_action( 'admin_post_nopriv_newsletter_campaign_kit_subscribe', 'newsletter_campaign_kit_handle_subscribe' );

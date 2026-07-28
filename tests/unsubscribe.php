@@ -19,11 +19,20 @@ function wp_generate_password() {
 function wp_salt() {
 	return 'test-salt';
 }
-function add_query_arg( $args, $url ) {
+function add_query_arg( $args, $value, $url = '' ) {
+	if ( ! is_array( $args ) ) {
+		$args = array( $args => $value );
+	} else {
+		$url = $value;
+	}
+
 	return $url . '?' . http_build_query( $args );
 }
 function admin_url() {
 	return 'https://example.test/wp-admin/admin-post.php';
+}
+function home_url( $path = '' ) {
+	return 'https://example.test' . $path;
 }
 function wp_parse_url( $url, $component ) {
 	return parse_url( $url, $component );

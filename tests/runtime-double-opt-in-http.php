@@ -102,7 +102,7 @@ try {
 
 	$message = newsletter_double_opt_in_http_mailpit_message( $email );
 	newsletter_double_opt_in_http_assert( is_array( $message ) && false !== strpos( $message['HTML'] ?? '', '<table role="presentation"' ) && false !== strpos( $message['Text'] ?? '', 'Confirm your email address' ), 'Mailpit did not receive the professional multipart confirmation.' );
-	preg_match( '/href="([^"]+action=newsletter_campaign_kit_confirm_subscription[^"]+)"/', html_entity_decode( $message['HTML'] ), $link_match );
+	preg_match( '/href="([^"]+\/newsletter\/confirm\/\?token=[^"]+)"/', html_entity_decode( $message['HTML'] ), $link_match );
 	$confirmation_url = isset( $link_match[1] ) ? str_replace( 'http://localhost:8080', 'http://nginx', $link_match[1] ) : '';
 	newsletter_double_opt_in_http_assert( '' !== $confirmation_url, 'Confirmation URL could not be extracted from the delivered email.' );
 	$confirmation = wp_remote_get( $confirmation_url, array( 'redirection' => 0, 'timeout' => 15 ) );

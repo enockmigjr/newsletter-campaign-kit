@@ -24,6 +24,7 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Paginer les abonnes et le journal cote SQL, avec tableaux responsives, filtres persistants et details d'audit nettoyes.
 - Exporter sans troncature les abonnes par lots, ainsi que les listes, tags, segments, thematiques et rapports de campagne, avec neutralisation des formules CSV.
 - Importer des abonnes par CSV avec mapping d'en-tetes, preview non mutative, rapport temporaire et application transactionnelle par ligne.
+- Fournir un fichier CSV d'exemple genere cote serveur et isoler les formulaires longs dans des dialogues admin accessibles.
 - Refuser les doublons du fichier, audiences inconnues, suppressions actives et reactivations sans option et consentement explicites.
 - Creer des listes et tags de segmentation avec liaisons abonnes/listes/tags.
 - Affecter ou retirer des abonnes aux listes et tags depuis l'administration.
@@ -53,14 +54,16 @@ Newsletter Campaign Kit est un plugin WordPress reutilisable pour les abonnement
 - Configurer `wp_mail`, le provider JSON HTTP generique ou un adaptateur externe via filtre WordPress.
 - Envoyer au provider HTTP avec HTTPS obligatoire, Bearer secret cote serveur, corps HTML/texte et cle d'idempotence stable.
 - Recevoir les bounces et complaints via un webhook REST signe HMAC, borne a cinq minutes et protege contre le rejeu.
-- Afficher un reporting de livraison par campagne depuis la queue.
+- Afficher un reporting pagine et filtrable par campagne, liste, segment, thematique, statut et periode depuis la queue.
+- Distinguer l'acceptation par le transport (`sent`) d'une preuve de remise en boite, et afficher retries, echecs permanents, bounces et complaints sans inventer d'attribution fournisseur.
+- Calculer les taux uniques, le click-to-open, les conversions attribuees, les cohortes d'acquisition et les sources d'abonnement avec definitions visibles.
 - Capturer une fois l'audience au premier envoi avec regles, libelles et IDs internes des destinataires, puis reutiliser ce snapshot immutable aux relances; apres effacement, l'ID devient une cle opaque propre au snapshot.
 - Creer snapshot, membres et queue dans la meme transaction pour l'envoi immediat; pour une programmation, figer snapshot et membres a la confirmation puis creer la queue depuis cet instantane au declenchement WP-Cron.
 - Journaliser les evenements sensibles newsletter: inscription, desinscription, statut, export, listes, tags et campagnes.
 - Integrer les exports, effacements et le guide de confidentialite natifs de WordPress.
 - Exposer aux integrations serveur l'abonnement correspondant a l'e-mail du compte, sans endpoint public de recherche.
 - Capturer plusieurs thematiques depuis le formulaire d'inscription et conserver les choix pendant le double opt-in.
-- Reutiliser un article publie comme campagne, manuellement ou selon un mode automatique explicite, sans recopier titre, image, extrait ni contenu.
+- Reutiliser des articles et types de contenus publics autorises, dont les oeuvres PhotoVault non protegees, selon un mode manuel ou automatique extensible par filtre.
 - Prevenir les doubles soumissions sur les ecrans admin et paginer toutes les listes operationnelles.
 
 ## Capabilities

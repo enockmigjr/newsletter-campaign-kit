@@ -243,22 +243,22 @@ function newsletter_campaign_kit_render_blocks_page() {
 	$categories = newsletter_campaign_kit_get_block_categories();
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
-		<h1><?php esc_html_e( 'Editorial blocks', 'newsletter-campaign-kit' ); ?></h1>
-		<p><?php esc_html_e( 'Build reusable fragments that can be inserted into any campaign without replacing its full template.', 'newsletter-campaign-kit' ); ?></p>
-		<section class="nck-panel">
-			<h2><?php echo esc_html( $editing ? __( 'Edit block', 'newsletter-campaign-kit' ) : __( 'Create a reusable block', 'newsletter-campaign-kit' ) ); ?></h2>
+		<div class="nck-admin-toolbar"><div><h1><?php esc_html_e( 'Editorial blocks', 'newsletter-campaign-kit' ); ?></h1><p><?php esc_html_e( 'Build reusable fragments that can be inserted into any campaign without replacing its full template.', 'newsletter-campaign-kit' ); ?></p></div><button class="button button-primary" type="button" data-nck-dialog-open="nck-block-editor"><?php esc_html_e( 'Create block', 'newsletter-campaign-kit' ); ?></button></div>
+		<dialog id="nck-block-editor" class="nck-admin-dialog"<?php echo $editing ? ' data-nck-dialog-auto-open' : ''; ?>>
+			<header class="nck-admin-dialog__header"><div><h2><?php echo esc_html( $editing ? __( 'Edit block', 'newsletter-campaign-kit' ) : __( 'Create a reusable block', 'newsletter-campaign-kit' ) ); ?></h2><p><?php esc_html_e( 'Create one focused fragment with matching HTML and plain-text output.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
+			<section class="nck-admin-dialog__body">
 			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 				<input type="hidden" name="action" value="newsletter_campaign_kit_save_block"><input type="hidden" name="block_id" value="<?php echo esc_attr( $form['id'] ); ?>">
 				<?php wp_nonce_field( 'newsletter_campaign_kit_save_block_' . absint( $form['id'] ) ); ?>
 				<p><label><?php esc_html_e( 'Block name', 'newsletter-campaign-kit' ); ?><br><input class="regular-text" name="block_name" maxlength="190" required value="<?php echo esc_attr( $form['name'] ); ?>"></label></p>
 				<p><label><?php esc_html_e( 'Category', 'newsletter-campaign-kit' ); ?><br><select name="block_category"><?php foreach ( $categories as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $form['category'], $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></label></p>
-				<h3><?php esc_html_e( 'HTML fragment', 'newsletter-campaign-kit' ); ?></h3>
-				<?php wp_editor( $form['html_body'], 'nckblockhtml', array( 'textarea_name' => 'block_html_body', 'textarea_rows' => 10, 'media_buttons' => false ) ); ?>
+				<p><label for="nck-block-html"><?php esc_html_e( 'HTML fragment', 'newsletter-campaign-kit' ); ?><br><textarea id="nck-block-html" class="large-text code" name="block_html_body" rows="12" required><?php echo esc_textarea( $form['html_body'] ); ?></textarea></label></p>
 				<p><label><?php esc_html_e( 'Plain-text fragment', 'newsletter-campaign-kit' ); ?><br><textarea class="large-text code" name="block_text_body" rows="7"><?php echo esc_textarea( $form['text_body'] ); ?></textarea></label></p>
 				<p class="description"><?php esc_html_e( 'Leave plain text empty to generate it safely from the HTML fragment.', 'newsletter-campaign-kit' ); ?></p>
 				<?php submit_button( $editing ? __( 'Update block', 'newsletter-campaign-kit' ) : __( 'Create block', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 			</form>
-		</section>
+			</section>
+		</dialog>
 		<h2><?php esc_html_e( 'Block library', 'newsletter-campaign-kit' ); ?></h2>
 		<div class="nck-table-wrap"><table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Name', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Category', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Actions', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
 		<?php if ( empty( $blocks ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No reusable block yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>

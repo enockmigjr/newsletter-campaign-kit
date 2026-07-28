@@ -49,6 +49,28 @@ function newsletter_campaign_kit_handle_csv_import() {
 }
 add_action( 'admin_post_newsletter_campaign_kit_import_csv', 'newsletter_campaign_kit_handle_csv_import' );
 
+/** Download a UTF-8 CSV example matching the default import mapping. */
+function newsletter_campaign_kit_download_import_sample() {
+	if ( ! current_user_can( 'newsletter_manage_subscribers' ) || ! current_user_can( 'newsletter_manage_lists' ) ) {
+		wp_die( esc_html__( 'You are not allowed to download this import sample.', 'newsletter-campaign-kit' ) );
+	}
+	check_admin_referer( 'newsletter_campaign_kit_import_sample' );
+
+	nocache_headers();
+	header( 'Content-Type: text/csv; charset=utf-8' );
+	header( 'Content-Disposition: attachment; filename="newsletter-subscribers-example.csv"' );
+	echo "\xEF\xBB\xBF";
+	$stream = fopen( 'php://output', 'w' );
+	if ( false === $stream ) {
+		exit;
+	}
+	fputcsv( $stream, array( 'email', 'status', 'lists', 'tags', 'consent_text' ) );
+	fputcsv( $stream, array( 'collector@example.com', 'subscribed', 'Collectors|Public journal', 'Portrait|Client', 'Consent collected on registration form' ) );
+	fclose( $stream );
+	exit;
+}
+add_action( 'admin_post_newsletter_campaign_kit_import_sample', 'newsletter_campaign_kit_download_import_sample' );
+
 /** Render the CSV import screen and its short-lived report. */
 function newsletter_campaign_kit_render_import_page() {
 	if ( ! current_user_can( 'newsletter_manage_subscribers' ) || ! current_user_can( 'newsletter_manage_lists' ) ) {
@@ -62,8 +84,10 @@ function newsletter_campaign_kit_render_import_page() {
 	}
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
-		<h1><?php esc_html_e( 'Import subscribers', 'newsletter-campaign-kit' ); ?></h1>
-		<p><?php esc_html_e( 'Preview a mapped CSV before applying it. Lists and tags use existing names or slugs separated with a pipe (|).', 'newsletter-campaign-kit' ); ?></p>
+		<div class="nck-admin-toolbar">
+			<div><h1><?php esc_html_e( 'Import subscribers', 'newsletter-campaign-kit' ); ?></h1><p><?php esc_html_e( 'Preview a mapped CSV before applying it. Lists and tags use existing names or slugs separated with a pipe (|).', 'newsletter-campaign-kit' ); ?></p></div>
+			<div class="nck-inline-actions"><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=newsletter_campaign_kit_import_sample' ), 'newsletter_campaign_kit_import_sample' ) ); ?>"><?php esc_html_e( 'Download sample CSV', 'newsletter-campaign-kit' ); ?></a><button class="button button-primary" type="button" data-nck-dialog-open="nck-import-dialog"><?php esc_html_e( 'Start an import', 'newsletter-campaign-kit' ); ?></button></div>
+		</div>
 		<?php if ( isset( $_GET['import_error'] ) ) : ?><div class="notice notice-error"><p><?php esc_html_e( 'The CSV upload was rejected. Check its extension, size, and upload status.', 'newsletter-campaign-kit' ); ?></p></div><?php endif; ?>
 		<?php if ( is_wp_error( $report ) ) : ?><div class="notice notice-error"><p><?php echo esc_html( $report->get_error_message() ); ?></p></div><?php endif; ?>
 		<?php if ( is_array( $report ) ) : ?>
@@ -72,7 +96,10 @@ function newsletter_campaign_kit_render_import_page() {
 			<?php foreach ( array_slice( $report['rows'], 0, 100 ) as $row ) : ?><tr><td><?php echo esc_html( $row['line'] ); ?></td><td><?php echo esc_html( $row['status'] ); ?></td><td><?php echo esc_html( $row['action'] ); ?></td><td><?php echo esc_html( $row['message'] ); ?></td></tr><?php endforeach; ?>
 			</tbody></table>
 		<?php endif; ?>
-		<form method="POST" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-panel nck-form-table">
+		<dialog id="nck-import-dialog" class="nck-admin-dialog">
+		<header class="nck-admin-dialog__header"><div><h2><?php esc_html_e( 'Import a CSV audience', 'newsletter-campaign-kit' ); ?></h2><p><?php esc_html_e( 'Always preview the mapping before enabling application mode.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
+		<section class="nck-admin-dialog__body">
+		<form method="POST" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form-table">
 			<input type="hidden" name="action" value="newsletter_campaign_kit_import_csv">
 			<?php wp_nonce_field( 'newsletter_campaign_kit_import_csv' ); ?>
 			<table class="form-table"><tbody>
@@ -87,6 +114,8 @@ function newsletter_campaign_kit_render_import_page() {
 			</tbody></table>
 			<?php submit_button( __( 'Process CSV', 'newsletter-campaign-kit' ) ); ?>
 		</form>
+		</section>
+		</dialog>
 	</div>
 	<?php
 }

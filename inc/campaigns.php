@@ -235,6 +235,7 @@ function newsletter_campaign_kit_duplicate_campaign( $campaign_id, $actor_user_i
 			'target_audience' => $audience,
 			'topic_id'        => ! empty( $campaign['topic_id'] ) && newsletter_campaign_kit_record_is_active( newsletter_campaign_kit_get_topics_table(), $campaign['topic_id'] ) ? $campaign['topic_id'] : 0,
 			'source_type'     => $campaign['source_type'] ?? 'manual',
+			'source_post_type' => newsletter_campaign_kit_get_campaign_source_config( $campaign )['post_type'],
 			'source_post_count' => newsletter_campaign_kit_get_campaign_source_config( $campaign )['post_count'],
 			'source_window_hours' => newsletter_campaign_kit_get_campaign_source_config( $campaign )['window_hours'],
 			'source_category_id' => newsletter_campaign_kit_get_campaign_source_config( $campaign )['category_id'],
@@ -343,6 +344,7 @@ function newsletter_campaign_kit_get_campaign_input_from_request() {
 		'target_audience' => isset( $_POST['target_audience'] ) ? wp_unslash( $_POST['target_audience'] ) : 'all',
 		'topic_id'        => isset( $_POST['topic_id'] ) ? absint( $_POST['topic_id'] ) : 0,
 		'source_type'     => isset( $_POST['content_source_type'] ) ? wp_unslash( $_POST['content_source_type'] ) : 'manual',
+		'source_post_type' => isset( $_POST['source_post_type'] ) ? sanitize_key( wp_unslash( $_POST['source_post_type'] ) ) : 'post',
 		'source_post_count' => isset( $_POST['source_post_count'] ) ? absint( $_POST['source_post_count'] ) : 5,
 		'source_window_hours' => isset( $_POST['source_window_hours'] ) ? absint( $_POST['source_window_hours'] ) : 24,
 		'source_category_id' => isset( $_POST['source_category_id'] ) ? absint( $_POST['source_category_id'] ) : 0,
@@ -755,8 +757,9 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	$editing   = $editing && 'draft' === $editing['status'] ? $editing : null;
 	$source_config = newsletter_campaign_kit_get_campaign_source_config( $editing ?: array() );
 	$source_type   = sanitize_key( $editing['source_type'] ?? 'manual' );
+	$source_post_types = newsletter_campaign_kit_get_content_source_post_type_labels();
 	$source_categories = get_categories( array( 'hide_empty' => false, 'number' => 100 ) );
-	$source_posts      = get_posts( array( 'post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 100, 'orderby' => 'date', 'order' => 'DESC' ) );
+	$source_posts      = get_posts( array( 'post_type' => array_keys( $source_post_types ), 'post_status' => 'publish', 'posts_per_page' => 100, 'orderby' => 'date', 'order' => 'DESC' ) );
 	$selected_audience = 'all';
 	if ( $editing && ! empty( $editing['target_list_id'] ) ) {
 		$selected_audience = 'list:' . absint( $editing['target_list_id'] );
@@ -788,15 +791,18 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	}
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
-		<h1><?php esc_html_e( 'Campaigns', 'newsletter-campaign-kit' ); ?></h1>
-		<p><?php esc_html_e( 'Prepare editorial newsletters with controlled server-side states before delivery is enabled.', 'newsletter-campaign-kit' ); ?></p>
+		<div class="nck-admin-toolbar">
+			<div><h1><?php esc_html_e( 'Campaigns', 'newsletter-campaign-kit' ); ?></h1><p><?php esc_html_e( 'Prepare editorial newsletters with controlled server-side states before delivery is enabled.', 'newsletter-campaign-kit' ); ?></p></div>
+			<button class="button button-primary" type="button" data-nck-dialog-open="nck-campaign-editor"><?php esc_html_e( 'Create campaign', 'newsletter-campaign-kit' ); ?></button>
+		</div>
 
 		<?php if ( ! newsletter_campaign_kit_campaigns_table_exists() ) : ?>
 			<div class="notice notice-warning"><p><?php esc_html_e( 'Campaign tables are not installed yet. Reactivate or upgrade the plugin with the database available.', 'newsletter-campaign-kit' ); ?></p></div>
 		<?php endif; ?>
 
-		<section class="nck-panel">
-			<h2><?php echo esc_html( $editing ? __( 'Edit campaign draft', 'newsletter-campaign-kit' ) : __( 'Create campaign draft', 'newsletter-campaign-kit' ) ); ?></h2>
+		<dialog id="nck-campaign-editor" class="nck-admin-dialog"<?php echo $editing ? ' data-nck-dialog-auto-open' : ''; ?>>
+			<header class="nck-admin-dialog__header"><div><h2><?php echo esc_html( $editing ? __( 'Edit campaign draft', 'newsletter-campaign-kit' ) : __( 'Create campaign draft', 'newsletter-campaign-kit' ) ); ?></h2><p><?php esc_html_e( 'Compose the message, audience and optional WordPress content source.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
+			<section class="nck-admin-dialog__body">
 			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 				<input type="hidden" name="action" value="<?php echo esc_attr( $editing ? 'newsletter_campaign_kit_update_campaign' : 'newsletter_campaign_kit_create_campaign' ); ?>">
 				<?php if ( $editing ) : ?><input type="hidden" name="campaign_id" value="<?php echo esc_attr( $editing['id'] ); ?>"><?php endif; ?>
@@ -829,13 +835,14 @@ function newsletter_campaign_kit_render_campaigns_page() {
 				<fieldset class="nck-content-source">
 					<legend><?php esc_html_e( 'WordPress article source', 'newsletter-campaign-kit' ); ?></legend>
 					<p class="description"><?php esc_html_e( 'Append a live article selection when each delivery is generated. Recurring occurrences resolve this source independently.', 'newsletter-campaign-kit' ); ?></p>
-					<p><label for="nck-content-source-type"><?php esc_html_e( 'Source mode', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-content-source-type" name="content_source_type"><?php foreach ( newsletter_campaign_kit_get_content_source_types() as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $source_type, $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></p>
-					<div class="nck-form-grid">
+					<p><label for="nck-content-source-type"><?php esc_html_e( 'Source mode', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-content-source-type" name="content_source_type" data-nck-source-select><?php foreach ( newsletter_campaign_kit_get_content_source_types() as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $source_type, $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></p>
+					<p data-nck-source-for="latest_posts recent_window selected_posts"><label for="nck-source-post-type"><?php esc_html_e( 'Content type', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-source-post-type" name="source_post_type" data-nck-source-content-type><?php foreach ( $source_post_types as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $source_config['post_type'], $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></p>
+					<div class="nck-form-grid" data-nck-source-for="latest_posts recent_window category_posts selected_posts">
 						<p><label><?php esc_html_e( 'Maximum articles', 'newsletter-campaign-kit' ); ?><input type="number" name="source_post_count" min="1" max="20" value="<?php echo esc_attr( $source_config['post_count'] ); ?>"></label></p>
-						<p><label><?php esc_html_e( 'Recent window (hours)', 'newsletter-campaign-kit' ); ?><input type="number" name="source_window_hours" min="1" max="720" value="<?php echo esc_attr( $source_config['window_hours'] ); ?>"></label></p>
+						<p data-nck-source-for="recent_window"><label><?php esc_html_e( 'Recent window (hours)', 'newsletter-campaign-kit' ); ?><input type="number" name="source_window_hours" min="1" max="720" value="<?php echo esc_attr( $source_config['window_hours'] ); ?>"></label></p>
 					</div>
-					<p><label><?php esc_html_e( 'Article category', 'newsletter-campaign-kit' ); ?><br><select name="source_category_id"><option value="0"><?php esc_html_e( 'Choose a category', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $source_categories as $category ) : ?><option value="<?php echo esc_attr( $category->term_id ); ?>" <?php selected( absint( $source_config['category_id'] ), $category->term_id ); ?>><?php echo esc_html( $category->name ); ?></option><?php endforeach; ?></select></label></p>
-					<p><label><?php esc_html_e( 'Hand-picked articles', 'newsletter-campaign-kit' ); ?><br><select class="large-text" name="source_post_ids[]" multiple size="7"><?php foreach ( $source_posts as $source_post ) : ?><option value="<?php echo esc_attr( $source_post->ID ); ?>" <?php selected( in_array( $source_post->ID, array_map( 'absint', (array) $source_config['post_ids'] ), true ) ); ?>><?php echo esc_html( get_the_date( 'Y-m-d', $source_post ) . ' - ' . get_the_title( $source_post ) ); ?></option><?php endforeach; ?></select></label></p>
+					<p data-nck-source-for="category_posts"><label><?php esc_html_e( 'Article category', 'newsletter-campaign-kit' ); ?><br><select name="source_category_id"><option value="0"><?php esc_html_e( 'Choose a category', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $source_categories as $category ) : ?><option value="<?php echo esc_attr( $category->term_id ); ?>" <?php selected( absint( $source_config['category_id'] ), $category->term_id ); ?>><?php echo esc_html( $category->name ); ?></option><?php endforeach; ?></select></label></p>
+					<p data-nck-source-for="selected_posts"><label><?php esc_html_e( 'Hand-picked content', 'newsletter-campaign-kit' ); ?><br><select class="large-text" name="source_post_ids[]" multiple size="7" data-nck-source-content-items><?php foreach ( $source_posts as $source_post ) : ?><option value="<?php echo esc_attr( $source_post->ID ); ?>" data-nck-post-type="<?php echo esc_attr( $source_post->post_type ); ?>" <?php selected( in_array( $source_post->ID, array_map( 'absint', (array) $source_config['post_ids'] ), true ) ); ?>><?php echo esc_html( '[' . ( $source_post_types[ $source_post->post_type ] ?? $source_post->post_type ) . '] ' . get_the_date( 'Y-m-d', $source_post ) . ' - ' . get_the_title( $source_post ) ); ?></option><?php endforeach; ?></select></label></p>
 				</fieldset>
 				<?php if ( $blocks ) : ?>
 					<div class="nck-block-inserter">
@@ -849,7 +856,8 @@ function newsletter_campaign_kit_render_campaigns_page() {
 				<?php submit_button( $editing ? __( 'Save draft', 'newsletter-campaign-kit' ) : __( 'Create draft', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 				<?php if ( $editing ) : ?><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns' ) ); ?>"><?php esc_html_e( 'Cancel editing', 'newsletter-campaign-kit' ); ?></a><?php endif; ?>
 			</form>
-		</section>
+			</section>
+		</dialog>
 
 		<h2><?php esc_html_e( 'Campaign pipeline', 'newsletter-campaign-kit' ); ?></h2>
 		<div class="nck-table-wrap"><table class="widefat fixed striped">

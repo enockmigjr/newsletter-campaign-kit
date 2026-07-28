@@ -280,8 +280,22 @@ function newsletter_campaign_kit_render_segments_page() {
 	$editing_rules = is_array( $editing_rules ) ? $editing_rules : array();
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
-		<h1><?php esc_html_e( 'Lists & segments', 'newsletter-campaign-kit' ); ?></h1>
-		<p><?php esc_html_e( 'Prepare editorial audiences with reusable lists and subscriber tags.', 'newsletter-campaign-kit' ); ?></p>
+		<div class="nck-admin-toolbar">
+			<div><h1><?php esc_html_e( 'Lists & segments', 'newsletter-campaign-kit' ); ?></h1><p><?php esc_html_e( 'Build explicit and rule-based audiences without mixing their responsibilities.', 'newsletter-campaign-kit' ); ?></p></div>
+			<div class="nck-inline-actions">
+				<button class="button button-primary" type="button" data-nck-dialog-open="nck-list-create"><?php esc_html_e( 'New list', 'newsletter-campaign-kit' ); ?></button>
+				<button class="button" type="button" data-nck-dialog-open="nck-tag-create"><?php esc_html_e( 'New tag', 'newsletter-campaign-kit' ); ?></button>
+				<button class="button" type="button" data-nck-dialog-open="nck-segment-create"><?php esc_html_e( 'New segment', 'newsletter-campaign-kit' ); ?></button>
+				<button class="button" type="button" data-nck-dialog-open="nck-topic-create"><?php esc_html_e( 'New topic', 'newsletter-campaign-kit' ); ?></button>
+				<button class="button" type="button" data-nck-dialog-open="nck-audience-assignment"><?php esc_html_e( 'Assign audience', 'newsletter-campaign-kit' ); ?></button>
+			</div>
+		</div>
+		<div class="nck-concept-guide">
+			<div><strong><?php esc_html_e( 'Lists', 'newsletter-campaign-kit' ); ?></strong><span><?php esc_html_e( 'Explicit groups used as stable campaign audiences.', 'newsletter-campaign-kit' ); ?></span></div>
+			<div><strong><?php esc_html_e( 'Tags', 'newsletter-campaign-kit' ); ?></strong><span><?php esc_html_e( 'Internal attributes manually attached to subscribers.', 'newsletter-campaign-kit' ); ?></span></div>
+			<div><strong><?php esc_html_e( 'Segments', 'newsletter-campaign-kit' ); ?></strong><span><?php esc_html_e( 'Dynamic audiences recalculated from rules at send time.', 'newsletter-campaign-kit' ); ?></span></div>
+			<div><strong><?php esc_html_e( 'Topics', 'newsletter-campaign-kit' ); ?></strong><span><?php esc_html_e( 'Editorial preferences subscribers can choose themselves.', 'newsletter-campaign-kit' ); ?></span></div>
+		</div>
 		<?php if ( current_user_can( 'newsletter_view_reports' ) ) : ?>
 			<p class="nck-inline-actions">
 				<?php foreach ( array( 'lists' => __( 'Export lists', 'newsletter-campaign-kit' ), 'tags' => __( 'Export tags', 'newsletter-campaign-kit' ), 'segments' => __( 'Export segments', 'newsletter-campaign-kit' ), 'topics' => __( 'Export topics', 'newsletter-campaign-kit' ) ) as $export_kind => $export_label ) : ?>
@@ -294,9 +308,9 @@ function newsletter_campaign_kit_render_segments_page() {
 			<div class="notice notice-warning"><p><?php esc_html_e( 'Segment tables are not installed yet. Reactivate or upgrade the plugin with the database available.', 'newsletter-campaign-kit' ); ?></p></div>
 		<?php endif; ?>
 
-		<div class="nck-layout">
-			<section class="nck-panel">
-				<h2><?php esc_html_e( 'Create list', 'newsletter-campaign-kit' ); ?></h2>
+		<dialog id="nck-list-create" class="nck-admin-dialog">
+			<header class="nck-admin-dialog__header"><div><h2><?php esc_html_e( 'Create list', 'newsletter-campaign-kit' ); ?></h2><p><?php esc_html_e( 'Create a stable audience that can receive campaigns.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
+			<section class="nck-admin-dialog__body">
 				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 					<input type="hidden" name="action" value="newsletter_campaign_kit_create_list">
 					<?php wp_nonce_field( 'newsletter_campaign_kit_create_list' ); ?>
@@ -305,9 +319,11 @@ function newsletter_campaign_kit_render_segments_page() {
 					<?php submit_button( __( 'Create list', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 				</form>
 			</section>
+		</dialog>
 
-			<section class="nck-panel">
-				<h2><?php esc_html_e( 'Create tag', 'newsletter-campaign-kit' ); ?></h2>
+		<dialog id="nck-tag-create" class="nck-admin-dialog">
+			<header class="nck-admin-dialog__header"><div><h2><?php esc_html_e( 'Create tag', 'newsletter-campaign-kit' ); ?></h2><p><?php esc_html_e( 'Add a reusable internal attribute for audience rules.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
+			<section class="nck-admin-dialog__body">
 				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 					<input type="hidden" name="action" value="newsletter_campaign_kit_create_tag">
 					<?php wp_nonce_field( 'newsletter_campaign_kit_create_tag' ); ?>
@@ -316,10 +332,11 @@ function newsletter_campaign_kit_render_segments_page() {
 					<?php submit_button( __( 'Create tag', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 				</form>
 			</section>
-		</div>
+		</dialog>
 
-		<section class="nck-panel">
-			<h2><?php esc_html_e( 'Assign subscriber audiences', 'newsletter-campaign-kit' ); ?></h2>
+		<dialog id="nck-audience-assignment" class="nck-admin-dialog">
+			<header class="nck-admin-dialog__header"><div><h2><?php esc_html_e( 'Assign subscriber audiences', 'newsletter-campaign-kit' ); ?></h2><p><?php esc_html_e( 'Add or remove one subscriber from an explicit list or tag.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
+			<section class="nck-admin-dialog__body">
 			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-assignment-form">
 				<input type="hidden" name="action" value="newsletter_campaign_kit_update_assignment">
 				<?php wp_nonce_field( 'newsletter_campaign_kit_update_assignment' ); ?>
@@ -338,11 +355,12 @@ function newsletter_campaign_kit_render_segments_page() {
 				</select>
 				<button class="button button-primary" type="submit"><?php esc_html_e( 'Update assignment', 'newsletter-campaign-kit' ); ?></button>
 			</form>
-		</section>
+			</section>
+		</dialog>
 
-		<div class="nck-layout">
-			<section class="nck-panel">
-				<h2><?php echo esc_html( $editing ? __( 'Edit dynamic segment', 'newsletter-campaign-kit' ) : __( 'Create dynamic segment', 'newsletter-campaign-kit' ) ); ?></h2>
+		<dialog id="nck-segment-create" class="nck-admin-dialog"<?php echo $editing ? ' data-nck-dialog-auto-open' : ''; ?>>
+			<header class="nck-admin-dialog__header"><div><h2><?php echo esc_html( $editing ? __( 'Edit dynamic segment', 'newsletter-campaign-kit' ) : __( 'Create dynamic segment', 'newsletter-campaign-kit' ) ); ?></h2><p><?php esc_html_e( 'Combine lists, tags, sources and dates into a live audience.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
+			<section class="nck-admin-dialog__body">
 				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 					<input type="hidden" name="action" value="<?php echo esc_attr( $editing ? 'newsletter_campaign_kit_update_segment' : 'newsletter_campaign_kit_create_segment' ); ?>">
 					<?php if ( $editing ) : ?><input type="hidden" name="segment_id" value="<?php echo esc_attr( $editing['id'] ); ?>"><?php endif; ?>
@@ -377,9 +395,11 @@ function newsletter_campaign_kit_render_segments_page() {
 					<?php if ( $editing ) : ?><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=newsletter-campaign-kit-segments' ) ); ?>"><?php esc_html_e( 'Cancel editing', 'newsletter-campaign-kit' ); ?></a><?php endif; ?>
 				</form>
 			</section>
+		</dialog>
 
-			<section class="nck-panel">
-				<h2><?php esc_html_e( 'Create campaign topic', 'newsletter-campaign-kit' ); ?></h2>
+		<dialog id="nck-topic-create" class="nck-admin-dialog">
+			<header class="nck-admin-dialog__header"><div><h2><?php esc_html_e( 'Create campaign topic', 'newsletter-campaign-kit' ); ?></h2><p><?php esc_html_e( 'Expose one clear editorial preference to subscribers.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
+			<section class="nck-admin-dialog__body">
 				<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 					<input type="hidden" name="action" value="newsletter_campaign_kit_create_topic">
 					<?php wp_nonce_field( 'newsletter_campaign_kit_create_topic' ); ?>
@@ -389,7 +409,7 @@ function newsletter_campaign_kit_render_segments_page() {
 					<?php submit_button( __( 'Create topic', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 				</form>
 			</section>
-		</div>
+		</dialog>
 
 		<h2><?php esc_html_e( 'Lists', 'newsletter-campaign-kit' ); ?></h2>
 		<div class="nck-table-wrap"><table class="widefat fixed striped"><thead><tr><th><?php esc_html_e( 'Name', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Slug', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subscribers', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Description', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>

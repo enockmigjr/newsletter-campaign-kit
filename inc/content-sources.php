@@ -13,11 +13,43 @@ if ( ! defined( 'ABSPATH' ) ) {
 function newsletter_campaign_kit_get_content_source_types() {
 	return array(
 		'manual'         => __( 'Manual editorial content', 'newsletter-campaign-kit' ),
-		'latest_posts'   => __( 'Latest published articles', 'newsletter-campaign-kit' ),
-		'recent_window'  => __( 'Articles published in a recent time window', 'newsletter-campaign-kit' ),
+		'latest_posts'   => __( 'Latest published content', 'newsletter-campaign-kit' ),
+		'recent_window'  => __( 'Content published in a recent time window', 'newsletter-campaign-kit' ),
 		'category_posts' => __( 'Latest articles from one category', 'newsletter-campaign-kit' ),
-		'selected_posts' => __( 'A hand-picked article selection', 'newsletter-campaign-kit' ),
+		'selected_posts' => __( 'A hand-picked content selection', 'newsletter-campaign-kit' ),
 	);
+}
+
+/** Return public post types administrators may use as campaign content. */
+function newsletter_campaign_kit_get_content_source_post_types() {
+	$types = array( 'post' );
+	if ( post_type_exists( 'media_item' ) ) {
+		$types[] = 'media_item';
+	}
+
+	$types = apply_filters( 'newsletter_campaign_kit_content_source_post_types', $types );
+	$types = array_values(
+		array_filter(
+			array_unique( array_map( 'sanitize_key', (array) $types ) ),
+			static function ( $post_type ) {
+				$object = get_post_type_object( $post_type );
+				return $object && $object->public && 'attachment' !== $post_type;
+			}
+		)
+	);
+
+	return $types ?: array( 'post' );
+}
+
+/** Return labels for all allowed campaign source post types. */
+function newsletter_campaign_kit_get_content_source_post_type_labels() {
+	$labels = array();
+	foreach ( newsletter_campaign_kit_get_content_source_post_types() as $post_type ) {
+		$object               = get_post_type_object( $post_type );
+		$labels[ $post_type ] = $object && $object->labels ? $object->labels->name : $post_type;
+	}
+
+	return $labels;
 }
 
 /** Validate and serialize content source options. */
@@ -28,13 +60,19 @@ function newsletter_campaign_kit_prepare_content_source( $input ) {
 		return new WP_Error( 'newsletter_invalid_content_source', __( 'The campaign content source is invalid.', 'newsletter-campaign-kit' ) );
 	}
 
+	$post_type = sanitize_key( $input['source_post_type'] ?? 'post' );
+	if ( ! in_array( $post_type, newsletter_campaign_kit_get_content_source_post_types(), true ) ) {
+		return new WP_Error( 'newsletter_invalid_content_source_post_type', __( 'The selected content type is unavailable.', 'newsletter-campaign-kit' ) );
+	}
+
 	$config = array(
+		'post_type'    => $post_type,
 		'post_count'   => max( 1, min( 20, absint( $input['source_post_count'] ?? 5 ) ) ),
 		'window_hours' => max( 1, min( 720, absint( $input['source_window_hours'] ?? 24 ) ) ),
 		'category_id'  => absint( $input['source_category_id'] ?? 0 ),
 		'post_ids'     => array_values( array_unique( array_filter( array_map( 'absint', (array) ( $input['source_post_ids'] ?? array() ) ) ) ) ),
 	);
-	if ( 'category_posts' === $source_type && ( ! $config['category_id'] || ! term_exists( $config['category_id'], 'category' ) ) ) {
+	if ( 'category_posts' === $source_type && ( 'post' !== $post_type || ! $config['category_id'] || ! term_exists( $config['category_id'], 'category' ) ) ) {
 		return new WP_Error( 'newsletter_invalid_source_category', __( 'Choose an available article category.', 'newsletter-campaign-kit' ) );
 	}
 	if ( 'selected_posts' === $source_type && empty( $config['post_ids'] ) ) {
@@ -55,6 +93,7 @@ function newsletter_campaign_kit_get_campaign_source_config( $campaign ) {
 	return wp_parse_args(
 		$config,
 		array(
+			'post_type'    => 'post',
 			'post_count'   => 5,
 			'window_hours' => 24,
 			'category_id'  => 0,
@@ -72,7 +111,7 @@ function newsletter_campaign_kit_get_campaign_source_posts( $campaign ) {
 
 	$config = newsletter_campaign_kit_get_campaign_source_config( $campaign );
 	$args   = array(
-		'post_type'           => 'post',
+		'post_type'           => in_array( $config['post_type'], newsletter_campaign_kit_get_content_source_post_types(), true ) ? $config['post_type'] : 'post',
 		'post_status'         => 'publish',
 		'posts_per_page'      => max( 1, min( 20, absint( $config['post_count'] ) ) ),
 		'ignore_sticky_posts' => true,
@@ -80,6 +119,19 @@ function newsletter_campaign_kit_get_campaign_source_posts( $campaign ) {
 		'orderby'             => 'date',
 		'order'               => 'DESC',
 	);
+	if ( 'media_item' === $args['post_type'] ) {
+		$args['meta_query'] = array(
+			'relation' => 'OR',
+			array(
+				'key'     => 'is_protected',
+				'compare' => 'NOT EXISTS',
+			),
+			array(
+				'key'   => 'is_protected',
+				'value' => '0',
+			),
+		);
+	}
 	if ( 'recent_window' === $source_type ) {
 		$args['date_query'] = array(
 			array(
@@ -105,12 +157,13 @@ function newsletter_campaign_kit_render_campaign_source_posts( $posts ) {
 		return '';
 	}
 
-	$html = '<section><h2>' . esc_html__( 'From the visual journal', 'newsletter-campaign-kit' ) . '</h2>';
+	$html = '<section><h2>' . esc_html__( 'Selected stories and works', 'newsletter-campaign-kit' ) . '</h2>';
 	foreach ( $posts as $post ) {
 		$title   = get_the_title( $post );
 		$url     = get_permalink( $post );
 		$excerpt = has_excerpt( $post ) ? get_the_excerpt( $post ) : wp_trim_words( wp_strip_all_tags( $post->post_content ), 34 );
 		$image   = get_the_post_thumbnail_url( $post, 'medium_large' );
+		$label   = 'media_item' === $post->post_type ? __( 'View the work', 'newsletter-campaign-kit' ) : __( 'Read the complete article', 'newsletter-campaign-kit' );
 		$html   .= '<article style="margin:28px 0;padding-top:24px;border-top:1px solid #e9e6df">';
 		if ( $image ) {
 			$html .= '<p><a href="' . esc_url( $url ) . '"><img src="' . esc_url( $image ) . '" alt="" width="576" style="display:block;width:100%;height:auto;border:0"></a></p>';
@@ -118,7 +171,7 @@ function newsletter_campaign_kit_render_campaign_source_posts( $posts ) {
 		$html .= '<p style="font-size:12px;color:#686d68">' . esc_html( get_the_date( '', $post ) ) . '</p>';
 		$html .= '<h3><a href="' . esc_url( $url ) . '" style="color:#171a17">' . esc_html( $title ) . '</a></h3>';
 		$html .= '<p>' . esc_html( $excerpt ) . '</p>';
-		$html .= '<p><a href="' . esc_url( $url ) . '">' . esc_html__( 'Read the complete article', 'newsletter-campaign-kit' ) . '</a></p></article>';
+		$html .= '<p><a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a></p></article>';
 	}
 
 	return $html . '</section>';

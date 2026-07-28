@@ -390,9 +390,10 @@ function newsletter_campaign_kit_render_templates_page() {
 	$total        = newsletter_campaign_kit_count_templates( true );
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
-		<h1><?php esc_html_e( 'Email templates', 'newsletter-campaign-kit' ); ?></h1>
-		<section class="nck-panel">
-			<h2><?php echo esc_html( $editing ? __( 'Edit template', 'newsletter-campaign-kit' ) : __( 'Create a reusable template', 'newsletter-campaign-kit' ) ); ?></h2>
+		<div class="nck-admin-toolbar"><div><h1><?php esc_html_e( 'Email templates', 'newsletter-campaign-kit' ); ?></h1><p><?php esc_html_e( 'Reusable message foundations with independent HTML and plain-text versions.', 'newsletter-campaign-kit' ); ?></p></div><button class="button button-primary" type="button" data-nck-dialog-open="nck-template-editor"><?php esc_html_e( 'Create template', 'newsletter-campaign-kit' ); ?></button></div>
+		<dialog id="nck-template-editor" class="nck-admin-dialog"<?php echo $editing ? ' data-nck-dialog-auto-open' : ''; ?>>
+			<header class="nck-admin-dialog__header"><div><h2><?php echo esc_html( $editing ? __( 'Edit template', 'newsletter-campaign-kit' ) : __( 'Create a reusable template', 'newsletter-campaign-kit' ) ); ?></h2><p><?php esc_html_e( 'Define the reusable subject, preview and accessible message versions.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
+			<section class="nck-admin-dialog__body">
 			<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="nck-form">
 				<input type="hidden" name="action" value="newsletter_campaign_kit_save_template">
 				<input type="hidden" name="template_id" value="<?php echo esc_attr( $form['id'] ); ?>">
@@ -400,13 +401,13 @@ function newsletter_campaign_kit_render_templates_page() {
 				<p><label><?php esc_html_e( 'Template name', 'newsletter-campaign-kit' ); ?><br><input class="regular-text" name="template_name" maxlength="190" required value="<?php echo esc_attr( $form['name'] ); ?>"></label></p>
 				<p><label><?php esc_html_e( 'Default subject', 'newsletter-campaign-kit' ); ?><br><input class="large-text" name="template_subject" maxlength="190" required value="<?php echo esc_attr( $form['subject'] ); ?>"></label></p>
 				<p><label><?php esc_html_e( 'Inbox preview', 'newsletter-campaign-kit' ); ?><br><input class="large-text" name="template_preview_text" maxlength="255" value="<?php echo esc_attr( $form['preview_text'] ); ?>"></label></p>
-				<h3><?php esc_html_e( 'HTML version', 'newsletter-campaign-kit' ); ?></h3>
-				<?php wp_editor( $form['html_body'], 'ncktemplatehtml', array( 'textarea_name' => 'template_html_body', 'textarea_rows' => 12, 'media_buttons' => false ) ); ?>
+				<p><label for="nck-template-html"><?php esc_html_e( 'HTML version', 'newsletter-campaign-kit' ); ?><br><textarea id="nck-template-html" class="large-text code" name="template_html_body" rows="14" required><?php echo esc_textarea( $form['html_body'] ); ?></textarea></label></p>
 				<p><label><?php esc_html_e( 'Plain-text version', 'newsletter-campaign-kit' ); ?><br><textarea class="large-text code" name="template_text_body" rows="9"><?php echo esc_textarea( $form['text_body'] ); ?></textarea></label></p>
 				<p class="description"><?php esc_html_e( 'Leave plain text empty to generate it from the HTML content.', 'newsletter-campaign-kit' ); ?></p>
 				<?php submit_button( $editing ? __( 'Update template', 'newsletter-campaign-kit' ) : __( 'Create template', 'newsletter-campaign-kit' ), 'primary', 'submit', false ); ?>
 			</form>
-		</section>
+			</section>
+		</dialog>
 		<h2><?php esc_html_e( 'Template library', 'newsletter-campaign-kit' ); ?></h2>
 		<div class="nck-table-wrap"><table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Name', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subject', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Actions', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
 		<?php if ( empty( $templates ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No reusable template yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>

@@ -498,12 +498,6 @@ function newsletter_campaign_kit_handle_update_assignment() {
 
 	$subscriber_ids = isset( $_POST['subscriber_ids'] ) ? array_values( array_unique( array_filter( array_map( 'absint', (array) wp_unslash( $_POST['subscriber_ids'] ) ) ) ) ) : array();
 	$audiences      = isset( $_POST['audiences'] ) ? array_values( array_unique( array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['audiences'] ) ) ) ) : array();
-	if ( ! $subscriber_ids && isset( $_POST['subscriber_id'] ) ) {
-		$subscriber_ids[] = absint( $_POST['subscriber_id'] );
-	}
-	if ( ! $audiences && isset( $_POST['audience'] ) ) {
-		$audiences[] = sanitize_text_field( wp_unslash( $_POST['audience'] ) );
-	}
 	$operation = isset( $_POST['assignment_operation'] ) ? sanitize_key( wp_unslash( $_POST['assignment_operation'] ) ) : '';
 	if ( ! $subscriber_ids || ! $audiences || count( $subscriber_ids ) > 100 || count( $subscriber_ids ) * count( $audiences ) > 1000 || ! in_array( $operation, array( 'add', 'remove' ), true ) ) {
 		wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&assignment=invalid' ) );

@@ -44,16 +44,15 @@ try {
 	$first_token   = $subscriber['unsubscribe_token'];
 
 	$endpoint = add_query_arg(
-		array(
-			'action' => 'newsletter_campaign_kit_unsubscribe',
-			'token'  => $first_token,
-		),
-		'http://nginx/wp-admin/admin-post.php'
+		'token',
+		$first_token,
+		'http://nginx/newsletter/unsubscribe/'
 	);
 	$response = wp_remote_post(
 		$endpoint,
 		array(
 			'body'        => array( 'List-Unsubscribe' => 'One-Click' ),
+			'headers'     => array( 'Host' => 'localhost:8080' ),
 			'redirection' => 0,
 			'timeout'     => 10,
 		)
@@ -61,7 +60,7 @@ try {
 	newsletter_runtime_assert( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ), 'RFC 8058 endpoint did not return HTTP 200.' );
 	newsletter_runtime_assert( 'unsubscribed' === $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$subscribers_table} WHERE id = %d", $subscriber_id ) ), 'Endpoint did not unsubscribe the recipient.' );
 
-	$response = wp_remote_post( $endpoint, array( 'body' => array( 'List-Unsubscribe' => 'One-Click' ), 'redirection' => 0, 'timeout' => 10 ) );
+	$response = wp_remote_post( $endpoint, array( 'body' => array( 'List-Unsubscribe' => 'One-Click' ), 'headers' => array( 'Host' => 'localhost:8080' ), 'redirection' => 0, 'timeout' => 10 ) );
 	newsletter_runtime_assert( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ), 'Repeated one-click request was not idempotent.' );
 
 	newsletter_runtime_assert( true === newsletter_campaign_kit_subscribe_email( $email, 'runtime_test', 'Runtime reactivation consent' ), 'Reactivation failed.' );

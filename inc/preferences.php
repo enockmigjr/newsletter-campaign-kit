@@ -232,6 +232,8 @@ function newsletter_campaign_kit_handle_preferences() {
 	$status     = isset( $_GET['preferences'] ) ? sanitize_key( wp_unslash( $_GET['preferences'] ) ) : '';
 	if ( ! $subscriber ) {
 		status_header( 404 );
+	} else {
+		status_header( 200 );
 	}
 	newsletter_campaign_kit_render_preferences_document( $subscriber, $status );
 	exit;

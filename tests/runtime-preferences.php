@@ -74,30 +74,31 @@ try {
 	newsletter_preferences_runtime_assert( newsletter_campaign_kit_assign_subscriber_to_list( $subscriber['id'], $list_id ), 'The runtime subscriber could not be assigned to its isolated list.' );
 	newsletter_preferences_runtime_assert( count( newsletter_campaign_kit_get_subscriber_topic_preferences( $subscriber['id'] ) ) >= 2, 'Active topics were not exposed by the preference service.' );
 
-	$unsubscribe_endpoint = add_query_arg( array( 'action' => 'newsletter_campaign_kit_unsubscribe', 'token' => $subscriber['unsubscribe_token'] ), 'http://nginx/wp-admin/admin-post.php' );
-	$response = wp_remote_get( $unsubscribe_endpoint, array( 'redirection' => 0, 'timeout' => 10 ) );
+	$public_headers       = array( 'Host' => 'localhost:8080' );
+	$unsubscribe_endpoint = add_query_arg( 'token', $subscriber['unsubscribe_token'], 'http://nginx/newsletter/unsubscribe/' );
+	$response = wp_remote_get( $unsubscribe_endpoint, array( 'headers' => $public_headers, 'redirection' => 0, 'timeout' => 10 ) );
 	newsletter_preferences_runtime_assert( ! is_wp_error( $response ) && 302 === wp_remote_retrieve_response_code( $response ), 'A browser GET did not redirect to the preference center.' );
 	newsletter_preferences_runtime_assert( 'subscribed' === $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$subscribers_table} WHERE id = %d", $subscriber['id'] ) ), 'A browser GET changed subscription state.' );
 
-	$preferences_endpoint = add_query_arg( array( 'action' => 'newsletter_campaign_kit_preferences', 'token' => $subscriber['unsubscribe_token'] ), 'http://nginx/wp-admin/admin-post.php' );
-	$response = wp_remote_get( $preferences_endpoint, array( 'redirection' => 0, 'timeout' => 10 ) );
+	$preferences_endpoint = add_query_arg( 'token', $subscriber['unsubscribe_token'], 'http://nginx/newsletter/preferences/' );
+	$response = wp_remote_get( $preferences_endpoint, array( 'headers' => $public_headers, 'redirection' => 0, 'timeout' => 10 ) );
 	$body     = wp_remote_retrieve_body( $response );
 	newsletter_preferences_runtime_assert( 200 === wp_remote_retrieve_response_code( $response ) && false !== strpos( $body, 'Runtime portraits' ), 'The public preference center did not render active topics.' );
 	preg_match( '/name="_wpnonce" value="([A-Za-z0-9]+)"/', $body, $nonce_matches );
 	$preference_nonce = $nonce_matches[1] ?? '';
 	newsletter_preferences_runtime_assert( '' !== $preference_nonce, 'The public preference form did not contain a CSRF nonce.' );
 
-	$update_endpoint = 'http://nginx/wp-admin/admin-post.php';
+	$update_endpoint = $preferences_endpoint;
 	$response = wp_remote_post(
 		$update_endpoint,
-		array( 'body' => array( 'action' => 'newsletter_campaign_kit_update_preferences', 'token' => $subscriber['unsubscribe_token'], '_wpnonce' => 'invalid', 'topic_ids' => array( $topic_ids[1] ) ), 'redirection' => 0, 'timeout' => 10 )
+		array( 'headers' => $public_headers, 'body' => array( 'newsletter_intent' => 'update_preferences', 'token' => $subscriber['unsubscribe_token'], '_wpnonce' => 'invalid', 'topic_ids' => array( $topic_ids[1] ) ), 'redirection' => 0, 'timeout' => 10 )
 	);
 	newsletter_preferences_runtime_assert( 403 === wp_remote_retrieve_response_code( $response ), 'The preference endpoint accepted an invalid nonce.' );
 	newsletter_preferences_runtime_assert( newsletter_campaign_kit_subscriber_accepts_topic( $subscriber['id'], $topic_ids[0] ), 'Invalid preference request changed topic state.' );
 
 	$response = wp_remote_post(
 		$update_endpoint,
-		array( 'body' => array( 'action' => 'newsletter_campaign_kit_update_preferences', 'token' => $subscriber['unsubscribe_token'], '_wpnonce' => $preference_nonce, 'topic_ids' => array( $topic_ids[0] ) ), 'redirection' => 0, 'timeout' => 10 )
+		array( 'headers' => $public_headers, 'body' => array( 'newsletter_intent' => 'update_preferences', 'token' => $subscriber['unsubscribe_token'], '_wpnonce' => $preference_nonce, 'topic_ids' => array( $topic_ids[0] ) ), 'redirection' => 0, 'timeout' => 10 )
 	);
 	newsletter_preferences_runtime_assert( 302 === wp_remote_retrieve_response_code( $response ), 'Valid topic preferences were not accepted by the public endpoint.' );
 	newsletter_preferences_runtime_assert( newsletter_campaign_kit_subscriber_accepts_topic( $subscriber['id'], $topic_ids[0] ), 'Selected topic was rejected.' );

@@ -201,6 +201,7 @@ function newsletter_campaign_kit_handle_open_tracking() {
 		newsletter_campaign_kit_record_tracking_event( $context, 'open' );
 	}
 
+	status_header( 200 );
 	nocache_headers();
 	$pixel = base64_decode( 'R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==' );
 	header( 'Content-Type: image/gif' );

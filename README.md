@@ -207,6 +207,13 @@ Le endpoint `POST /wp-json/newsletter-campaign-kit/v1/provider-events` accepte u
 31. Executer `wp eval-file tests/runtime-advanced-exports.php` pour verifier exports audiences/campagnes, pagination complete des abonnes, UTF-8, anti-formule CSV, capability et nonce.
 32. Executer `wp eval-file tests/runtime-admin-pagination.php` pour verifier pagination et filtres des abonnes, suppressions, audits, campagnes, modeles, blocs et file de livraison.
 33. Executer `wp eval-file tests/runtime-audience-admin-pagination.php` pour verifier les paginations independantes des listes, tags, segments dynamiques et sujets de campagne.
+34. Executer `wp eval-file tests/runtime-public-tracking.php` pour verifier les statuts HTTP et redirections des routes publiques de suivi.
+35. Executer `wp eval-file tests/runtime-recurrence.php` pour verifier la creation atomique d'une occurrence et la progression du calendrier recurrent.
+
+Les routes publiques de preferences, desabonnement, ouverture et clic utilisent
+des URL propres sous `/newsletter/`. Une preference valide et le pixel
+d'ouverture renvoient explicitement un statut HTTP 200, meme lorsque WordPress
+avait initialement resolu la route virtuelle comme une 404.
 
 ## Hooks publics
 

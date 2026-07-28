@@ -41,6 +41,11 @@ $audit           = newsletter_campaign_kit_get_audit_table();
 $original_user   = get_current_user_id();
 
 try {
+	$ready_redirect = newsletter_campaign_kit_get_transition_redirect_url( 266, 'ready', true );
+	newsletter_confirmation_runtime_assert( false !== strpos( $ready_redirect, 'page=newsletter-campaign-kit-campaign-review' ) && false !== strpos( $ready_redirect, 'campaign_id=266' ), 'A ready campaign no longer redirects to its final review.' );
+	$failed_redirect = newsletter_campaign_kit_get_transition_redirect_url( 266, 'ready', false );
+	newsletter_confirmation_runtime_assert( false !== strpos( $failed_redirect, 'page=newsletter-campaign-kit-campaigns' ) && false !== strpos( $failed_redirect, 'transition=failed' ), 'A failed transition did not return to the campaign list.' );
+
 	$now       = current_time( 'mysql', true );
 	$list_name = 'Confirmation list ' . $suffix;
 	$wpdb->insert(

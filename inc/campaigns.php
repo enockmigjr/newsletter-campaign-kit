@@ -499,10 +499,33 @@ function newsletter_campaign_kit_handle_transition_campaign() {
 		newsletter_campaign_kit_sync_queue_for_campaign_transition( $campaign_id, $next_status );
 	}
 
-	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns&transition=' . ( false === $updated ? 'failed' : 'success' ) ) );
+	wp_safe_redirect( newsletter_campaign_kit_get_transition_redirect_url( $campaign_id, $next_status, false !== $updated ) );
 	exit;
 }
 add_action( 'admin_post_newsletter_campaign_kit_transition_campaign', 'newsletter_campaign_kit_handle_transition_campaign' );
+
+/** Return the next admin screen after a campaign status transition. */
+function newsletter_campaign_kit_get_transition_redirect_url( $campaign_id, $next_status, $succeeded ) {
+	$campaign_id = absint( $campaign_id );
+	$next_status = sanitize_key( $next_status );
+	if ( $succeeded && $campaign_id && 'ready' === $next_status ) {
+		return add_query_arg(
+			array(
+				'page'        => 'newsletter-campaign-kit-campaign-review',
+				'campaign_id' => $campaign_id,
+			),
+			admin_url( 'admin.php' )
+		);
+	}
+
+	return add_query_arg(
+		array(
+			'page'       => 'newsletter-campaign-kit-campaigns',
+			'transition' => $succeeded ? 'success' : 'failed',
+		),
+		admin_url( 'admin.php' )
+	);
+}
 
 function newsletter_campaign_kit_parse_schedule_datetime( $value ) {
 	$value = sanitize_text_field( $value );
@@ -922,7 +945,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 					<td><?php echo esc_html( get_date_from_gmt( $campaign['updated_at'], 'Y-m-d H:i' ) ); ?></td>
 					<td>
 						<div class="nck-inline-actions">
-							<?php if ( current_user_can( 'newsletter_send_campaigns' ) ) : ?><a class="button button-small" href="<?php echo esc_url( add_query_arg( array( 'page' => 'newsletter-campaign-kit-campaign-review', 'campaign_id' => absint( $campaign['id'] ) ), admin_url( 'admin.php' ) ) ); ?>"><?php esc_html_e( 'Details', 'newsletter-campaign-kit' ); ?></a><?php endif; ?>
+							<?php if ( current_user_can( 'newsletter_send_campaigns' ) ) : ?><a class="button button-small" href="<?php echo esc_url( add_query_arg( array( 'page' => 'newsletter-campaign-kit-campaign-review', 'campaign_id' => absint( $campaign['id'] ) ), admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( in_array( $campaign['status'], array( 'ready', 'scheduled', 'paused' ), true ) ? __( 'Review / send', 'newsletter-campaign-kit' ) : __( 'Details', 'newsletter-campaign-kit' ) ); ?></a><?php endif; ?>
 							<a class="button button-small" target="_blank" rel="noopener" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=newsletter_campaign_kit_preview&kind=campaign&id=' . absint( $campaign['id'] ) ), 'newsletter_campaign_kit_preview_campaign_' . absint( $campaign['id'] ) ) ); ?>"><?php esc_html_e( 'Preview', 'newsletter-campaign-kit' ); ?></a>
 							<?php if ( current_user_can( 'newsletter_view_reports' ) && in_array( $campaign['status'], array( 'sending', 'sent', 'failed', 'cancelled' ), true ) ) : ?>
 								<a class="button button-small" href="<?php echo esc_url( add_query_arg( array( 'page' => 'newsletter-campaign-kit-reports', 'campaign_id' => absint( $campaign['id'] ) ), admin_url( 'admin.php' ) ) ); ?>"><?php esc_html_e( 'Statistics', 'newsletter-campaign-kit' ); ?></a>

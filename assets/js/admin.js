@@ -155,14 +155,16 @@
 		});
 		scope.querySelectorAll('[data-nck-source-content-type]').forEach(function(select) {
 			const form = select.closest('form');
-			const contentSelect = form ? form.querySelector('[data-nck-source-content-items]') : null;
-			if (!contentSelect) return;
+			const contentSelects = form ? form.querySelectorAll('[data-nck-source-content-items], [data-nck-source-content-categories]') : [];
+			if (!contentSelects.length) return;
 			function syncContentItems() {
-				contentSelect.querySelectorAll('option[data-nck-post-type]').forEach(function(option) {
-					const matches = option.dataset.nckPostType === select.value;
-					option.hidden = !matches;
-					option.disabled = !matches;
-					if (!matches) option.selected = false;
+				contentSelects.forEach(function(contentSelect) {
+					contentSelect.querySelectorAll('option[data-nck-post-type]').forEach(function(option) {
+						const matches = option.dataset.nckPostType === select.value;
+						option.hidden = !matches;
+						option.disabled = !matches;
+						if (!matches) option.selected = false;
+					});
 				});
 			}
 			if (select.dataset.nckContentTypeBound !== '1') {

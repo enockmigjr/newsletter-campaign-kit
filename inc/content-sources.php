@@ -68,6 +68,14 @@ function newsletter_campaign_kit_get_content_source_post_type_labels() {
 	return $labels;
 }
 
+/** Return the category-like taxonomy used by one campaign content type. */
+function newsletter_campaign_kit_get_content_source_taxonomy( $post_type ) {
+	$post_type = sanitize_key( $post_type );
+	$taxonomy  = 'media_item' === $post_type ? 'media_category' : 'category';
+
+	return taxonomy_exists( $taxonomy ) && is_object_in_taxonomy( $post_type, $taxonomy ) ? $taxonomy : '';
+}
+
 /** Validate and serialize content source options. */
 function newsletter_campaign_kit_prepare_content_source( $input ) {
 	$types       = newsletter_campaign_kit_get_content_source_types();
@@ -92,7 +100,8 @@ function newsletter_campaign_kit_prepare_content_source( $input ) {
 	if ( ! isset( newsletter_campaign_kit_get_content_source_layouts()[ $config['layout'] ] ) ) {
 		$config['layout'] = 'editorial';
 	}
-	if ( 'category_posts' === $source_type && ( 'post' !== $post_type || ! $config['category_id'] || ! term_exists( $config['category_id'], 'category' ) ) ) {
+	$source_taxonomy = newsletter_campaign_kit_get_content_source_taxonomy( $post_type );
+	if ( 'category_posts' === $source_type && ( ! $source_taxonomy || ! $config['category_id'] || ! term_exists( $config['category_id'], $source_taxonomy ) ) ) {
 		return new WP_Error( 'newsletter_invalid_source_category', __( 'Choose an available article category.', 'newsletter-campaign-kit' ) );
 	}
 	if ( 'selected_posts' === $source_type && empty( $config['post_ids'] ) ) {
@@ -162,7 +171,16 @@ function newsletter_campaign_kit_get_campaign_source_posts( $campaign ) {
 			),
 		);
 	} elseif ( 'category_posts' === $source_type ) {
-		$args['cat'] = absint( $config['category_id'] );
+		$taxonomy = newsletter_campaign_kit_get_content_source_taxonomy( $args['post_type'] );
+		if ( $taxonomy ) {
+			$args['tax_query'] = array(
+				array(
+					'taxonomy' => $taxonomy,
+					'field'    => 'term_id',
+					'terms'    => array( absint( $config['category_id'] ) ),
+				),
+			);
+		}
 	} elseif ( 'selected_posts' === $source_type ) {
 		$args['post__in']       = array_values( array_filter( array_map( 'absint', (array) $config['post_ids'] ) ) );
 		$args['orderby']        = 'post__in';

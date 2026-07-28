@@ -22,6 +22,7 @@ $topic_id     = 0;
 $subscriber_id = 0;
 $post_ids     = array();
 $campaign_ids = array();
+$term_ids     = array();
 $old_settings = get_option( 'newsletter_campaign_kit_provider_settings', array() );
 
 try {
@@ -97,6 +98,19 @@ try {
 		)
 	);
 	newsletter_post_runtime_assert( is_wp_error( $invalid_category ) && 'newsletter_invalid_source_category' === $invalid_category->get_error_code(), 'Invalid category sources do not expose a precise error.' );
+	if ( post_type_exists( 'media_item' ) && taxonomy_exists( 'media_category' ) ) {
+		$media_term = wp_insert_term( 'Runtime media category ' . $suffix, 'media_category' );
+		newsletter_post_runtime_assert( ! is_wp_error( $media_term ), 'The media category fixture could not be created.' );
+		$term_ids[] = (int) $media_term['term_id'];
+		$media_source = newsletter_campaign_kit_prepare_content_source(
+			array(
+				'source_type'        => 'category_posts',
+				'source_post_type'   => 'media_item',
+				'source_category_id' => $media_term['term_id'],
+			)
+		);
+		newsletter_post_runtime_assert( ! is_wp_error( $media_source ), 'Media categories cannot be used as campaign sources.' );
+	}
 
 	echo wp_json_encode(
 		array(
@@ -106,6 +120,7 @@ try {
 			'article_layout'        => true,
 			'layout_catalogue'      => 10,
 			'creation_errors'       => 'specific',
+			'typed_categories'      => true,
 			'idempotent'            => true,
 		)
 	);
@@ -117,6 +132,9 @@ try {
 	}
 	foreach ( $post_ids as $post_id ) {
 		wp_delete_post( $post_id, true );
+	}
+	foreach ( $term_ids as $term_id ) {
+		wp_delete_term( $term_id, 'media_category' );
 	}
 	if ( $subscriber_id ) {
 		$wpdb->delete( newsletter_campaign_kit_get_subscriber_topics_table(), array( 'subscriber_id' => $subscriber_id ), array( '%d' ) );

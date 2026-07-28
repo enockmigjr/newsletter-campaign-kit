@@ -825,7 +825,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	$creation_errors = array(
 		'newsletter_invalid_content_source'           => __( 'Choose a valid WordPress content source.', 'newsletter-campaign-kit' ),
 		'newsletter_invalid_content_source_post_type' => __( 'The selected content type is unavailable.', 'newsletter-campaign-kit' ),
-		'newsletter_invalid_source_category'          => __( 'Choose an article category when using the category source.', 'newsletter-campaign-kit' ),
+		'newsletter_invalid_source_category'          => __( 'Choose a category matching the selected content type.', 'newsletter-campaign-kit' ),
 		'newsletter_empty_source_selection'           => __( 'Choose at least one published item for the hand-picked source.', 'newsletter-campaign-kit' ),
 		'newsletter_invalid_audience'                  => __( 'Choose an available campaign audience.', 'newsletter-campaign-kit' ),
 		'newsletter_invalid_campaign_topic'           => __( 'Choose an active campaign topic or use no topic.', 'newsletter-campaign-kit' ),
@@ -836,7 +836,17 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	$source_config = newsletter_campaign_kit_get_campaign_source_config( $editing ?: array() );
 	$source_type   = sanitize_key( $editing['source_type'] ?? 'manual' );
 	$source_post_types = newsletter_campaign_kit_get_content_source_post_type_labels();
-	$source_categories = get_categories( array( 'hide_empty' => false, 'number' => 100 ) );
+	$source_categories = array();
+	foreach ( array_keys( $source_post_types ) as $source_post_type ) {
+		$taxonomy = newsletter_campaign_kit_get_content_source_taxonomy( $source_post_type );
+		if ( ! $taxonomy ) {
+			continue;
+		}
+		$terms = get_terms( array( 'taxonomy' => $taxonomy, 'hide_empty' => false, 'number' => 100 ) );
+		if ( ! is_wp_error( $terms ) ) {
+			$source_categories[ $source_post_type ] = $terms;
+		}
+	}
 	$source_posts      = get_posts( array( 'post_type' => array_keys( $source_post_types ), 'post_status' => 'publish', 'posts_per_page' => 100, 'orderby' => 'date', 'order' => 'DESC' ) );
 	$selected_audience = 'all';
 	if ( $editing && ! empty( $editing['target_list_id'] ) ) {
@@ -916,13 +926,13 @@ function newsletter_campaign_kit_render_campaigns_page() {
 					<legend><?php esc_html_e( 'WordPress article source', 'newsletter-campaign-kit' ); ?></legend>
 					<p class="description"><?php esc_html_e( 'Append a live article selection when each delivery is generated. Recurring occurrences resolve this source independently.', 'newsletter-campaign-kit' ); ?></p>
 					<p><label for="nck-content-source-type"><?php esc_html_e( 'Source mode', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-content-source-type" name="content_source_type" data-nck-source-select><?php foreach ( newsletter_campaign_kit_get_content_source_types() as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $source_type, $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></p>
-					<p data-nck-source-for="latest_posts recent_window selected_posts"><label for="nck-source-post-type"><?php esc_html_e( 'Content type', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-source-post-type" name="source_post_type" data-nck-source-content-type><?php foreach ( $source_post_types as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $source_config['post_type'], $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></p>
+					<p data-nck-source-for="latest_posts recent_window category_posts selected_posts"><label for="nck-source-post-type"><?php esc_html_e( 'Content type', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-source-post-type" name="source_post_type" data-nck-source-content-type><?php foreach ( $source_post_types as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $source_config['post_type'], $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></p>
 					<div class="nck-form-grid" data-nck-source-for="latest_posts recent_window category_posts selected_posts">
 						<p><label><?php esc_html_e( 'Maximum articles', 'newsletter-campaign-kit' ); ?><input type="number" name="source_post_count" min="1" max="20" value="<?php echo esc_attr( $source_config['post_count'] ); ?>"></label></p>
 						<p data-nck-source-for="recent_window"><label><?php esc_html_e( 'Recent window (hours)', 'newsletter-campaign-kit' ); ?><input type="number" name="source_window_hours" min="1" max="720" value="<?php echo esc_attr( $source_config['window_hours'] ); ?>"></label></p>
 					</div>
 					<p data-nck-source-for="latest_posts recent_window category_posts selected_posts"><label for="nck-source-layout"><?php esc_html_e( 'Article layout', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-source-layout" name="source_layout"><?php foreach ( newsletter_campaign_kit_get_content_source_layouts() as $layout_key => $layout_label ) : ?><option value="<?php echo esc_attr( $layout_key ); ?>" <?php selected( $source_config['layout'], $layout_key ); ?>><?php echo esc_html( $layout_label ); ?></option><?php endforeach; ?></select></p>
-					<p data-nck-source-for="category_posts"><label><?php esc_html_e( 'Article category', 'newsletter-campaign-kit' ); ?><br><select name="source_category_id"><option value="0"><?php esc_html_e( 'Choose a category', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $source_categories as $category ) : ?><option value="<?php echo esc_attr( $category->term_id ); ?>" <?php selected( absint( $source_config['category_id'] ), $category->term_id ); ?>><?php echo esc_html( $category->name ); ?></option><?php endforeach; ?></select></label></p>
+					<p data-nck-source-for="category_posts"><label><?php esc_html_e( 'Content category', 'newsletter-campaign-kit' ); ?><br><select name="source_category_id" data-nck-source-content-categories><option value="0"><?php esc_html_e( 'Choose a category', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $source_categories as $category_post_type => $categories ) : ?><?php foreach ( $categories as $category ) : ?><option value="<?php echo esc_attr( $category->term_id ); ?>" data-nck-post-type="<?php echo esc_attr( $category_post_type ); ?>" <?php selected( $source_config['post_type'] === $category_post_type && absint( $source_config['category_id'] ) === (int) $category->term_id ); ?>><?php echo esc_html( '[' . $source_post_types[ $category_post_type ] . '] ' . $category->name ); ?></option><?php endforeach; ?><?php endforeach; ?></select></label></p>
 					<p data-nck-source-for="selected_posts"><label><?php esc_html_e( 'Hand-picked content', 'newsletter-campaign-kit' ); ?><br><select class="large-text" name="source_post_ids[]" multiple size="7" data-nck-source-content-items><?php foreach ( $source_posts as $source_post ) : ?><option value="<?php echo esc_attr( $source_post->ID ); ?>" data-nck-post-type="<?php echo esc_attr( $source_post->post_type ); ?>" <?php selected( in_array( $source_post->ID, array_map( 'absint', (array) $source_config['post_ids'] ), true ) ); ?>><?php echo esc_html( '[' . ( $source_post_types[ $source_post->post_type ] ?? $source_post->post_type ) . '] ' . get_the_date( 'Y-m-d', $source_post ) . ' - ' . get_the_title( $source_post ) ); ?></option><?php endforeach; ?></select></label></p>
 				</fieldset>
 				<?php if ( $blocks ) : ?>

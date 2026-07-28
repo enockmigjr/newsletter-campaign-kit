@@ -20,6 +20,15 @@ function newsletter_campaign_kit_get_content_source_types() {
 	);
 }
 
+/** Return supported article layouts for dynamic campaign content. */
+function newsletter_campaign_kit_get_content_source_layouts() {
+	return array(
+		'editorial'   => __( 'Editorial: title, summary, then image', 'newsletter-campaign-kit' ),
+		'image_first' => __( 'Visual: image before the text', 'newsletter-campaign-kit' ),
+		'text_only'   => __( 'Text only: hide article images', 'newsletter-campaign-kit' ),
+	);
+}
+
 /** Return public post types administrators may use as campaign content. */
 function newsletter_campaign_kit_get_content_source_post_types() {
 	$types = array( 'post' );
@@ -71,7 +80,11 @@ function newsletter_campaign_kit_prepare_content_source( $input ) {
 		'window_hours' => max( 1, min( 720, absint( $input['source_window_hours'] ?? 24 ) ) ),
 		'category_id'  => absint( $input['source_category_id'] ?? 0 ),
 		'post_ids'     => array_values( array_unique( array_filter( array_map( 'absint', (array) ( $input['source_post_ids'] ?? array() ) ) ) ) ),
+		'layout'       => sanitize_key( $input['source_layout'] ?? 'editorial' ),
 	);
+	if ( ! isset( newsletter_campaign_kit_get_content_source_layouts()[ $config['layout'] ] ) ) {
+		$config['layout'] = 'editorial';
+	}
 	if ( 'category_posts' === $source_type && ( 'post' !== $post_type || ! $config['category_id'] || ! term_exists( $config['category_id'], 'category' ) ) ) {
 		return new WP_Error( 'newsletter_invalid_source_category', __( 'Choose an available article category.', 'newsletter-campaign-kit' ) );
 	}
@@ -98,6 +111,7 @@ function newsletter_campaign_kit_get_campaign_source_config( $campaign ) {
 			'window_hours' => 24,
 			'category_id'  => 0,
 			'post_ids'     => array(),
+			'layout'       => 'editorial',
 		)
 	);
 }
@@ -152,9 +166,13 @@ function newsletter_campaign_kit_get_campaign_source_posts( $campaign ) {
 }
 
 /** Render an email-safe editorial article selection. */
-function newsletter_campaign_kit_render_campaign_source_posts( $posts ) {
+function newsletter_campaign_kit_render_campaign_source_posts( $posts, $layout = 'editorial' ) {
 	if ( empty( $posts ) ) {
 		return '';
+	}
+	$layout = sanitize_key( $layout );
+	if ( ! isset( newsletter_campaign_kit_get_content_source_layouts()[ $layout ] ) ) {
+		$layout = 'editorial';
 	}
 
 	$html = '<section><h2>' . esc_html__( 'Selected stories and works', 'newsletter-campaign-kit' ) . '</h2>';
@@ -165,12 +183,19 @@ function newsletter_campaign_kit_render_campaign_source_posts( $posts ) {
 		$image   = get_the_post_thumbnail_url( $post, 'medium_large' );
 		$label   = 'media_item' === $post->post_type ? __( 'View the work', 'newsletter-campaign-kit' ) : __( 'Read the complete article', 'newsletter-campaign-kit' );
 		$html   .= '<article style="margin:28px 0;padding-top:24px;border-top:1px solid #e9e6df">';
-		if ( $image ) {
-			$html .= '<p><a href="' . esc_url( $url ) . '"><img src="' . esc_url( $image ) . '" alt="" width="576" style="display:block;width:100%;height:auto;border:0"></a></p>';
+		$image_html = '';
+		if ( $image && 'text_only' !== $layout ) {
+			$image_html = '<p><a href="' . esc_url( $url ) . '"><img src="' . esc_url( $image ) . '" alt="" width="576" style="display:block;width:100%;height:auto;max-height:360px;object-fit:cover;border:0"></a></p>';
+		}
+		if ( 'image_first' === $layout ) {
+			$html .= $image_html;
 		}
 		$html .= '<p style="font-size:12px;color:#686d68">' . esc_html( get_the_date( '', $post ) ) . '</p>';
 		$html .= '<h3><a href="' . esc_url( $url ) . '" style="color:#171a17">' . esc_html( $title ) . '</a></h3>';
 		$html .= '<p>' . esc_html( $excerpt ) . '</p>';
+		if ( 'editorial' === $layout ) {
+			$html .= $image_html;
+		}
 		$html .= '<p><a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a></p></article>';
 	}
 
@@ -187,7 +212,8 @@ function newsletter_campaign_kit_resolve_dynamic_campaign_body( $campaign ) {
 	}
 	$base  = (string) ( $campaign['body'] ?? '' );
 	$posts = newsletter_campaign_kit_get_campaign_source_posts( $campaign );
-	$feed  = newsletter_campaign_kit_render_campaign_source_posts( $posts );
+	$config = newsletter_campaign_kit_get_campaign_source_config( $campaign );
+	$feed  = newsletter_campaign_kit_render_campaign_source_posts( $posts, $config['layout'] );
 
 	$cache[ $cache_key ] = trim( $base . $feed );
 	return $cache[ $cache_key ];

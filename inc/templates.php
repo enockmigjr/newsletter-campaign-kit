@@ -445,7 +445,8 @@ function newsletter_campaign_kit_handle_preview() {
 		$content = $record ? array( 'subject' => $record['name'], 'preview_text' => $record['category'], 'html_body' => $record['html_body'], 'text_body' => $record['text_body'] ) : null;
 	} else {
 		$record = function_exists( 'newsletter_campaign_kit_get_campaign' ) ? newsletter_campaign_kit_get_campaign( $id ) : null;
-		$content = $record ? array( 'subject' => $record['subject'], 'preview_text' => $record['preview_text'], 'html_body' => $record['body'], 'text_body' => $record['text_body'] ?? '' ) : null;
+		$resolved_body = $record && function_exists( 'newsletter_campaign_kit_resolve_dynamic_campaign_body' ) ? newsletter_campaign_kit_resolve_dynamic_campaign_body( $record ) : ( $record['body'] ?? '' );
+		$content = $record ? array( 'subject' => $record['subject'], 'preview_text' => $record['preview_text'], 'html_body' => $resolved_body, 'text_body' => 'manual' === sanitize_key( $record['source_type'] ?? 'manual' ) ? ( $record['text_body'] ?? '' ) : '' ) : null;
 	}
 	if ( ! $content ) {
 		wp_die( esc_html__( 'Preview content not found.', 'newsletter-campaign-kit' ), '', array( 'response' => 404 ) );

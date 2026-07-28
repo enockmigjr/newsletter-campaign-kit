@@ -349,6 +349,7 @@ function newsletter_campaign_kit_get_campaign_input_from_request() {
 		'source_window_hours' => isset( $_POST['source_window_hours'] ) ? absint( $_POST['source_window_hours'] ) : 24,
 		'source_category_id' => isset( $_POST['source_category_id'] ) ? absint( $_POST['source_category_id'] ) : 0,
 		'source_post_ids' => isset( $_POST['source_post_ids'] ) && is_array( $_POST['source_post_ids'] ) ? array_map( 'absint', wp_unslash( $_POST['source_post_ids'] ) ) : array(),
+		'source_layout'   => isset( $_POST['source_layout'] ) ? sanitize_key( wp_unslash( $_POST['source_layout'] ) ) : 'editorial',
 	);
 }
 
@@ -884,13 +885,14 @@ function newsletter_campaign_kit_render_campaigns_page() {
 					</select>
 				</p>
 				<p>
-					<label class="screen-reader-text" for="nck-topic-id"><?php esc_html_e( 'Campaign topic', 'newsletter-campaign-kit' ); ?></label>
+					<label for="nck-topic-id"><?php esc_html_e( 'Campaign topic', 'newsletter-campaign-kit' ); ?></label><br>
 					<select id="nck-topic-id" name="topic_id">
 						<option value="0" <?php selected( $editing ? (int) $editing['topic_id'] : 0, 0 ); ?>><?php esc_html_e( 'No campaign topic', 'newsletter-campaign-kit' ); ?></option>
 						<?php foreach ( $topics as $topic ) : ?>
 							<option value="<?php echo esc_attr( $topic['id'] ); ?>" <?php selected( $editing ? (int) $editing['topic_id'] : 0, (int) $topic['id'] ); ?>><?php echo esc_html( $topic['name'] ); ?></option>
 						<?php endforeach; ?>
 					</select>
+					<br><small><?php esc_html_e( 'Subscribers who disabled this topic are excluded from the audience. No topic ignores thematic preferences.', 'newsletter-campaign-kit' ); ?></small>
 				</p>
 				<fieldset class="nck-content-source">
 					<legend><?php esc_html_e( 'WordPress article source', 'newsletter-campaign-kit' ); ?></legend>
@@ -901,6 +903,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 						<p><label><?php esc_html_e( 'Maximum articles', 'newsletter-campaign-kit' ); ?><input type="number" name="source_post_count" min="1" max="20" value="<?php echo esc_attr( $source_config['post_count'] ); ?>"></label></p>
 						<p data-nck-source-for="recent_window"><label><?php esc_html_e( 'Recent window (hours)', 'newsletter-campaign-kit' ); ?><input type="number" name="source_window_hours" min="1" max="720" value="<?php echo esc_attr( $source_config['window_hours'] ); ?>"></label></p>
 					</div>
+					<p data-nck-source-for="latest_posts recent_window category_posts selected_posts"><label for="nck-source-layout"><?php esc_html_e( 'Article layout', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-source-layout" name="source_layout"><?php foreach ( newsletter_campaign_kit_get_content_source_layouts() as $layout_key => $layout_label ) : ?><option value="<?php echo esc_attr( $layout_key ); ?>" <?php selected( $source_config['layout'], $layout_key ); ?>><?php echo esc_html( $layout_label ); ?></option><?php endforeach; ?></select></p>
 					<p data-nck-source-for="category_posts"><label><?php esc_html_e( 'Article category', 'newsletter-campaign-kit' ); ?><br><select name="source_category_id"><option value="0"><?php esc_html_e( 'Choose a category', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $source_categories as $category ) : ?><option value="<?php echo esc_attr( $category->term_id ); ?>" <?php selected( absint( $source_config['category_id'] ), $category->term_id ); ?>><?php echo esc_html( $category->name ); ?></option><?php endforeach; ?></select></label></p>
 					<p data-nck-source-for="selected_posts"><label><?php esc_html_e( 'Hand-picked content', 'newsletter-campaign-kit' ); ?><br><select class="large-text" name="source_post_ids[]" multiple size="7" data-nck-source-content-items><?php foreach ( $source_posts as $source_post ) : ?><option value="<?php echo esc_attr( $source_post->ID ); ?>" data-nck-post-type="<?php echo esc_attr( $source_post->post_type ); ?>" <?php selected( in_array( $source_post->ID, array_map( 'absint', (array) $source_config['post_ids'] ), true ) ); ?>><?php echo esc_html( '[' . ( $source_post_types[ $source_post->post_type ] ?? $source_post->post_type ) . '] ' . get_the_date( 'Y-m-d', $source_post ) . ' - ' . get_the_title( $source_post ) ); ?></option><?php endforeach; ?></select></label></p>
 				</fieldset>

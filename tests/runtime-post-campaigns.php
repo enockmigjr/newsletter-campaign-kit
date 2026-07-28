@@ -63,11 +63,34 @@ try {
 	newsletter_post_runtime_assert( $campaign && 'draft' === $campaign['status'], 'Publishing did not create an editable campaign draft.' );
 	newsletter_post_runtime_assert( $topic_id === absint( $campaign['topic_id'] ) && false !== strpos( $campaign['body'], 'complete editorial article' ), 'The article content or configured topic was not reused.' );
 	newsletter_post_runtime_assert( $campaign_id === newsletter_campaign_kit_create_post_campaign( $post_id, 1 ), 'Article campaign creation was not idempotent.' );
+	$dynamic_campaign_id = newsletter_campaign_kit_create_campaign(
+		array(
+			'title'                 => 'Dynamic article preview ' . $suffix,
+			'subject'               => 'Dynamic article preview',
+			'html_body'             => '<p>Editorial introduction.</p>',
+			'text_body'             => '',
+			'target_audience'       => 'all',
+			'source_type'           => 'selected_posts',
+			'source_post_type'      => 'post',
+			'source_post_count'     => 1,
+			'source_post_ids'       => array( $post_id ),
+			'source_layout'         => 'text_only',
+		),
+		1
+	);
+	newsletter_post_runtime_assert( is_int( $dynamic_campaign_id ), 'The dynamic article campaign could not be created.' );
+	$campaign_ids[]  = $dynamic_campaign_id;
+	$dynamic_campaign = newsletter_campaign_kit_get_campaign( $dynamic_campaign_id );
+	$dynamic_body     = newsletter_campaign_kit_resolve_dynamic_campaign_body( $dynamic_campaign );
+	newsletter_post_runtime_assert( false !== strpos( $dynamic_body, get_the_title( $post_id ) ), 'Dynamic articles were missing from the resolved preview body.' );
+	newsletter_post_runtime_assert( 'text_only' === newsletter_campaign_kit_get_campaign_source_config( $dynamic_campaign )['layout'], 'The selected article layout was not persisted.' );
 
 	echo wp_json_encode(
 		array(
 			'pending_topic_capture' => true,
 			'post_campaign_draft'   => true,
+			'dynamic_preview'       => true,
+			'article_layout'        => true,
 			'idempotent'            => true,
 		)
 	);

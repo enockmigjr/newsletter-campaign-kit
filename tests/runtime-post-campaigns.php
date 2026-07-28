@@ -94,10 +94,18 @@ try {
 			'target_audience'   => 'all',
 			'source_type'       => 'category_posts',
 			'source_post_type'  => 'post',
-			'source_category_id' => 0,
+			'source_category_id' => 999999999,
 		)
 	);
 	newsletter_post_runtime_assert( is_wp_error( $invalid_category ) && 'newsletter_invalid_source_category' === $invalid_category->get_error_code(), 'Invalid category sources do not expose a precise error.' );
+	$all_categories = newsletter_campaign_kit_prepare_content_source(
+		array(
+			'source_type'        => 'category_posts',
+			'source_post_type'   => 'post',
+			'source_category_id' => 0,
+		)
+	);
+	newsletter_post_runtime_assert( ! is_wp_error( $all_categories ), 'The all-categories source was rejected.' );
 	if ( post_type_exists( 'media_item' ) && taxonomy_exists( 'media_category' ) ) {
 		$media_term = wp_insert_term( 'Runtime media category ' . $suffix, 'media_category' );
 		newsletter_post_runtime_assert( ! is_wp_error( $media_term ), 'The media category fixture could not be created.' );
@@ -121,6 +129,7 @@ try {
 			'layout_catalogue'      => 10,
 			'creation_errors'       => 'specific',
 			'typed_categories'      => true,
+			'all_categories'        => true,
 			'idempotent'            => true,
 		)
 	);

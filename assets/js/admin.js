@@ -130,6 +130,18 @@
 		});
 	}
 
+	function validateHandPicked(container) {
+		container.querySelectorAll('[data-nck-source-content-items]').forEach(function(list) {
+			const checkboxes = Array.from(list.querySelectorAll('input[type="checkbox"]:not(:disabled)'));
+			checkboxes.forEach(function(checkbox) {
+				checkbox.setCustomValidity('');
+			});
+			if (checkboxes.length && !checkboxes.some(function(checkbox) { return checkbox.checked; })) {
+				checkboxes[0].setCustomValidity('Choose at least one published item.');
+			}
+		});
+	}
+
 	function initializeSurface(root) {
 		const scope = root || document;
 		initializeEditors(scope);
@@ -146,6 +158,7 @@
 						control.disabled = field.hidden;
 					});
 				});
+				validateHandPicked(container);
 			}
 			if (select.dataset.nckSourceBound !== '1') {
 				select.dataset.nckSourceBound = '1';
@@ -159,19 +172,36 @@
 			if (!contentSelects.length) return;
 			function syncContentItems() {
 				contentSelects.forEach(function(contentSelect) {
-					contentSelect.querySelectorAll('option[data-nck-post-type]').forEach(function(option) {
-						const matches = option.dataset.nckPostType === select.value;
-						option.hidden = !matches;
-						option.disabled = !matches;
-						if (!matches) option.selected = false;
+					contentSelect.querySelectorAll('[data-nck-post-type]').forEach(function(item) {
+						const matches = item.dataset.nckPostType === select.value;
+						const control = item.matches('option') ? item : item.querySelector('input');
+						item.hidden = !matches;
+						if (!control) return;
+						control.disabled = !matches;
+						if (!matches) {
+							if (control.matches('option')) {
+								control.selected = false;
+							} else {
+								control.checked = false;
+							}
+						}
 					});
 				});
+				if (form) validateHandPicked(form);
 			}
 			if (select.dataset.nckContentTypeBound !== '1') {
 				select.dataset.nckContentTypeBound = '1';
 				select.addEventListener('change', syncContentItems);
 			}
 			syncContentItems();
+		});
+		scope.querySelectorAll('[data-nck-source-content-items] input[type="checkbox"]').forEach(function(checkbox) {
+			if (checkbox.dataset.nckSelectionBound === '1') return;
+			checkbox.dataset.nckSelectionBound = '1';
+			checkbox.addEventListener('change', function() {
+				const form = checkbox.closest('form');
+				if (form) validateHandPicked(form);
+			});
 		});
 		scope.querySelectorAll('[data-nck-check-filter]').forEach(function(input) {
 			const list = document.getElementById(input.dataset.nckCheckFilter);

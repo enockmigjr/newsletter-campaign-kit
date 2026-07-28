@@ -101,7 +101,7 @@ function newsletter_campaign_kit_prepare_content_source( $input ) {
 		$config['layout'] = 'editorial';
 	}
 	$source_taxonomy = newsletter_campaign_kit_get_content_source_taxonomy( $post_type );
-	if ( 'category_posts' === $source_type && ( ! $source_taxonomy || ! $config['category_id'] || ! term_exists( $config['category_id'], $source_taxonomy ) ) ) {
+	if ( 'category_posts' === $source_type && ( ! $source_taxonomy || ( $config['category_id'] && ! term_exists( $config['category_id'], $source_taxonomy ) ) ) ) {
 		return new WP_Error( 'newsletter_invalid_source_category', __( 'Choose an available article category.', 'newsletter-campaign-kit' ) );
 	}
 	if ( 'selected_posts' === $source_type && empty( $config['post_ids'] ) ) {
@@ -172,7 +172,7 @@ function newsletter_campaign_kit_get_campaign_source_posts( $campaign ) {
 		);
 	} elseif ( 'category_posts' === $source_type ) {
 		$taxonomy = newsletter_campaign_kit_get_content_source_taxonomy( $args['post_type'] );
-		if ( $taxonomy ) {
+		if ( $taxonomy && ! empty( $config['category_id'] ) ) {
 			$args['tax_query'] = array(
 				array(
 					'taxonomy' => $taxonomy,

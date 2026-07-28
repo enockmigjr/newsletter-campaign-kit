@@ -1,5 +1,7 @@
 # Newsletter Campaign Kit
 
+Guide fonctionnel des écrans et du flux de travail : [GUIDE-ADMIN.md](GUIDE-ADMIN.md).
+
 ## Fournisseurs d'envoi
 
 - Brevo recommande: `NEWSLETTER_CAMPAIGN_KIT_BREVO_API_KEY`.

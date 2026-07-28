@@ -396,6 +396,53 @@ function newsletter_campaign_kit_handle_process_queue() {
 }
 add_action( 'admin_post_newsletter_campaign_kit_process_queue', 'newsletter_campaign_kit_handle_process_queue' );
 
+/** Apply a safe action to one pending delivery without rewriting sent history. */
+function newsletter_campaign_kit_handle_queue_item_action() {
+	global $wpdb;
+
+	if ( ! current_user_can( 'newsletter_send_campaigns' ) ) {
+		wp_die( esc_html__( 'You are not allowed to manage newsletter deliveries.', 'newsletter-campaign-kit' ) );
+	}
+	$item_id   = isset( $_POST['queue_item_id'] ) ? absint( $_POST['queue_item_id'] ) : 0;
+	$operation = isset( $_POST['queue_operation'] ) ? sanitize_key( wp_unslash( $_POST['queue_operation'] ) ) : '';
+	check_admin_referer( 'newsletter_campaign_kit_queue_item_' . $item_id );
+
+	$table = newsletter_campaign_kit_get_queue_table();
+	$item  = $item_id && newsletter_campaign_kit_queue_table_exists()
+		? $wpdb->get_row( $wpdb->prepare( "SELECT id, status FROM {$table} WHERE id = %d LIMIT 1", $item_id ), ARRAY_A )
+		: null;
+	$result = false;
+	$now    = current_time( 'mysql', true );
+	if ( $item && 'retry' === $operation && 'pending' === $item['status'] ) {
+		$result = $wpdb->update(
+			$table,
+			array( 'next_attempt_at' => $now, 'last_error' => '', 'updated_at' => $now ),
+			array( 'id' => $item_id, 'status' => 'pending' ),
+			array( '%s', '%s', '%s' ),
+			array( '%d', '%s' )
+		);
+	} elseif ( $item && 'cancel' === $operation && in_array( $item['status'], array( 'pending', 'paused' ), true ) ) {
+		$result = $wpdb->update(
+			$table,
+			array( 'status' => 'cancelled', 'locked_at' => null, 'updated_at' => $now ),
+			array( 'id' => $item_id, 'status' => $item['status'] ),
+			array( '%s', '%s', '%s' ),
+			array( '%d', '%s' )
+		);
+	}
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+		newsletter_campaign_kit_log_event(
+			false === $result ? 'newsletter_queue_item_action_failed' : 'newsletter_queue_item_action',
+			false === $result ? 'failure' : 'success',
+			0,
+			array( 'queue_item_id' => $item_id, 'operation' => $operation )
+		);
+	}
+	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-queue&queue_result=' . ( false === $result ? 'failed' : 'updated' ) ) );
+	exit;
+}
+add_action( 'admin_post_newsletter_campaign_kit_queue_item_action', 'newsletter_campaign_kit_handle_queue_item_action' );
+
 function newsletter_campaign_kit_register_queue_menu() {
 	add_submenu_page(
 		'newsletter-campaign-kit',
@@ -429,8 +476,8 @@ function newsletter_campaign_kit_render_queue_page() {
 		<div class="notice <?php echo esc_attr( 'healthy' === $health['status'] ? 'notice-success' : ( 'pending' === $health['status'] ? 'notice-info' : 'notice-warning' ) ); ?> inline"><p><strong><?php echo esc_html( sprintf( __( 'Scheduler: %s', 'newsletter-campaign-kit' ), ucfirst( $health['status'] ) ) ); ?></strong> <?php echo esc_html( $health['message'] ); ?></p></div>
 
 		<div class="nck-grid">
-			<?php foreach ( array( 'total', 'pending', 'sent', 'failed', 'paused', 'cancelled' ) as $status ) : ?>
-				<div class="nck-card"><span><?php echo esc_html( ucfirst( $status ) ); ?></span><strong><?php echo esc_html( number_format_i18n( $counts[ $status ] ) ); ?></strong></div>
+			<?php foreach ( array( 'total', 'pending', 'sent', 'failed', 'paused', 'cancelled' ) as $count_status ) : ?>
+				<div class="nck-card"><span><?php echo esc_html( ucfirst( $count_status ) ); ?></span><strong><?php echo esc_html( number_format_i18n( $counts[ $count_status ] ) ); ?></strong></div>
 			<?php endforeach; ?>
 		</div>
 
@@ -452,9 +499,9 @@ function newsletter_campaign_kit_render_queue_page() {
 		</form>
 
 		<div class="nck-table-wrap"><table class="widefat fixed striped">
-			<thead><tr><th><?php esc_html_e( 'Campaign', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subscriber', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Attempts', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Next attempt', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Last error', 'newsletter-campaign-kit' ); ?></th></tr></thead>
+			<thead><tr><th><?php esc_html_e( 'Campaign', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Subscriber', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Attempts', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Next attempt', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Details', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Actions', 'newsletter-campaign-kit' ); ?></th></tr></thead>
 			<tbody>
-			<?php if ( empty( $items ) ) : ?><tr><td colspan="6"><?php esc_html_e( 'No queued delivery yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
+			<?php if ( empty( $items ) ) : ?><tr><td colspan="7"><?php esc_html_e( 'No queued delivery yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
 			<?php foreach ( $items as $item ) : ?>
 				<tr>
 					<td><?php echo esc_html( $item['campaign_title'] ? $item['campaign_title'] : '#' . absint( $item['campaign_id'] ) ); ?></td>
@@ -462,7 +509,15 @@ function newsletter_campaign_kit_render_queue_page() {
 					<td><code><?php echo esc_html( $item['status'] ); ?></code></td>
 					<td><?php echo esc_html( absint( $item['attempts'] ) ); ?></td>
 					<td><?php echo esc_html( get_date_from_gmt( $item['next_attempt_at'], 'Y-m-d H:i' ) ); ?></td>
-					<td><?php echo esc_html( $item['last_error'] ? $item['last_error'] : '-' ); ?></td>
+					<td><details class="nck-row-details"><summary><?php esc_html_e( 'Inspect', 'newsletter-campaign-kit' ); ?></summary><dl><dt><?php esc_html_e( 'Queue ID', 'newsletter-campaign-kit' ); ?></dt><dd>#<?php echo esc_html( absint( $item['id'] ) ); ?></dd><dt><?php esc_html_e( 'Updated', 'newsletter-campaign-kit' ); ?></dt><dd><?php echo esc_html( $item['updated_at'] ); ?></dd><dt><?php esc_html_e( 'Last error', 'newsletter-campaign-kit' ); ?></dt><dd><?php echo esc_html( $item['last_error'] ? $item['last_error'] : '-' ); ?></dd></dl></details></td>
+					<td><div class="nck-inline-actions">
+						<?php if ( 'pending' === $item['status'] ) : ?>
+							<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="newsletter_campaign_kit_queue_item_action"><input type="hidden" name="queue_operation" value="retry"><input type="hidden" name="queue_item_id" value="<?php echo esc_attr( $item['id'] ); ?>"><?php wp_nonce_field( 'newsletter_campaign_kit_queue_item_' . absint( $item['id'] ) ); ?><button class="button button-small" type="submit"><?php esc_html_e( 'Retry now', 'newsletter-campaign-kit' ); ?></button></form>
+						<?php endif; ?>
+						<?php if ( in_array( $item['status'], array( 'pending', 'paused' ), true ) ) : ?>
+							<form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-nck-confirm="<?php esc_attr_e( 'Cancel this delivery permanently?', 'newsletter-campaign-kit' ); ?>"><input type="hidden" name="action" value="newsletter_campaign_kit_queue_item_action"><input type="hidden" name="queue_operation" value="cancel"><input type="hidden" name="queue_item_id" value="<?php echo esc_attr( $item['id'] ); ?>"><?php wp_nonce_field( 'newsletter_campaign_kit_queue_item_' . absint( $item['id'] ) ); ?><button class="button button-small nck-danger-button" type="submit"><?php esc_html_e( 'Cancel', 'newsletter-campaign-kit' ); ?></button></form>
+						<?php else : ?>-<?php endif; ?>
+					</div></td>
 				</tr>
 			<?php endforeach; ?>
 			</tbody>

@@ -390,11 +390,12 @@ function newsletter_campaign_kit_render_reports_page() {
 	$topics = newsletter_campaign_kit_get_topics( 100, 0 );
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
-		<h1><?php esc_html_e( 'Campaign reports', 'newsletter-campaign-kit' ); ?></h1>
-		<p><?php esc_html_e( 'Delivery, engagement and attributed conversion metrics from first-party campaign events. Open rates remain estimates when mail clients block or proxy images.', 'newsletter-campaign-kit' ); ?></p>
-		<p><a class="button" href="<?php echo esc_url( newsletter_campaign_kit_get_export_url( 'campaigns' ) ); ?>"><span class="dashicons dashicons-download" aria-hidden="true"></span> <?php esc_html_e( 'Export campaign reports', 'newsletter-campaign-kit' ); ?></a></p>
-		<h2><?php esc_html_e( 'Campaign table filters', 'newsletter-campaign-kit' ); ?></h2>
-		<p><?php esc_html_e( 'These filters apply to the detailed campaign table below. Portfolio, acquisition and engagement summaries remain global so their totals stay comparable over time.', 'newsletter-campaign-kit' ); ?></p>
+		<header class="nck-report-hero">
+			<div><span class="nck-eyebrow"><?php esc_html_e( 'Performance intelligence', 'newsletter-campaign-kit' ); ?></span><h1><?php esc_html_e( 'Campaign reports', 'newsletter-campaign-kit' ); ?></h1><p><?php esc_html_e( 'Read delivery, audience growth, engagement and attributed conversions from first-party events. Open rates remain estimates when mail clients block or proxy images.', 'newsletter-campaign-kit' ); ?></p></div>
+			<a class="button button-primary" href="<?php echo esc_url( newsletter_campaign_kit_get_export_url( 'campaigns' ) ); ?>"><span class="dashicons dashicons-download" aria-hidden="true"></span> <?php esc_html_e( 'Export CSV', 'newsletter-campaign-kit' ); ?></a>
+		</header>
+		<nav class="nck-report-nav" aria-label="<?php esc_attr_e( 'Report sections', 'newsletter-campaign-kit' ); ?>"><a href="#nck-report-overview"><?php esc_html_e( 'Overview', 'newsletter-campaign-kit' ); ?></a><a href="#nck-report-acquisition"><?php esc_html_e( 'Acquisition', 'newsletter-campaign-kit' ); ?></a><a href="#nck-report-engagement"><?php esc_html_e( 'Engagement', 'newsletter-campaign-kit' ); ?></a><a href="#nck-report-campaigns"><?php esc_html_e( 'Campaign detail', 'newsletter-campaign-kit' ); ?></a></nav>
+		<section class="nck-report-filter-panel"><div><span class="nck-eyebrow"><?php esc_html_e( 'Focused analysis', 'newsletter-campaign-kit' ); ?></span><h2><?php esc_html_e( 'Campaign table filters', 'newsletter-campaign-kit' ); ?></h2><p><?php esc_html_e( 'Filters affect the detailed campaign table only. Portfolio, acquisition and engagement summaries remain global so totals stay comparable over time.', 'newsletter-campaign-kit' ); ?></p></div>
 		<form class="nck-report-filters" method="GET" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>">
 			<input type="hidden" name="page" value="newsletter-campaign-kit-reports">
 			<select name="campaign_id"><option value="0"><?php esc_html_e( 'All campaigns', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $campaigns as $campaign ) : ?><option value="<?php echo esc_attr( $campaign['id'] ); ?>" <?php selected( $filters['campaign_id'], $campaign['id'] ); ?>><?php echo esc_html( $campaign['title'] ); ?></option><?php endforeach; ?></select>
@@ -407,9 +408,10 @@ function newsletter_campaign_kit_render_reports_page() {
 			<button class="button button-primary" type="submit"><?php esc_html_e( 'Apply filters', 'newsletter-campaign-kit' ); ?></button>
 			<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=newsletter-campaign-kit-reports' ) ); ?>"><?php esc_html_e( 'Reset', 'newsletter-campaign-kit' ); ?></a>
 		</form>
+		</section>
 
-		<h2><?php esc_html_e( 'Global portfolio indicators', 'newsletter-campaign-kit' ); ?></h2>
-		<div class="nck-grid">
+		<section id="nck-report-overview" class="nck-report-section"><span class="nck-eyebrow"><?php esc_html_e( 'Overview', 'newsletter-campaign-kit' ); ?></span><h2><?php esc_html_e( 'Global portfolio indicators', 'newsletter-campaign-kit' ); ?></h2>
+		<div class="nck-grid nck-metric-grid">
 			<div class="nck-card"><span><?php esc_html_e( 'Campaigns', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $totals['campaigns'] ) ); ?></strong></div>
 			<div class="nck-card"><span><?php esc_html_e( 'Queued', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $totals['queued'] ) ); ?></strong></div>
 			<div class="nck-card"><span><?php esc_html_e( 'Sent', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $totals['sent'] ) ); ?></strong></div>
@@ -421,15 +423,16 @@ function newsletter_campaign_kit_render_reports_page() {
 			<div class="nck-card"><span><?php esc_html_e( 'Provider complaints', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $provider_events['complaint'] ) ); ?></strong></div>
 		</div>
 		<details class="nck-panel"><summary><strong><?php esc_html_e( 'KPI definitions and attribution', 'newsletter-campaign-kit' ); ?></strong></summary><p><?php esc_html_e( 'Sent means the configured transport accepted the message; it is not a mailbox delivery receipt. Delivery rate is sent divided by queued. Open and click rates use unique, non-automated recipients divided by sent messages. Click-to-open is unique clickers divided by unique openers.', 'newsletter-campaign-kit' ); ?></p><p><?php esc_html_e( 'A conversion is attributed to the most recent signed campaign click recorded by the first-party cookie during the 30-day attribution window. Provider bounces and complaints are authenticated globally but cannot be assigned to a campaign unless the provider supplies a campaign-safe identifier.', 'newsletter-campaign-kit' ); ?></p></details>
+		</section>
 
-		<section class="nck-panel"><h2><?php esc_html_e( 'Subscription health', 'newsletter-campaign-kit' ); ?></h2><div class="nck-grid">
+		<section id="nck-report-acquisition" class="nck-panel nck-report-section"><span class="nck-eyebrow"><?php esc_html_e( 'Acquisition', 'newsletter-campaign-kit' ); ?></span><h2><?php esc_html_e( 'Subscription health', 'newsletter-campaign-kit' ); ?></h2><div class="nck-grid">
 			<div class="nck-card"><span><?php esc_html_e( 'Active subscribers', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $subscriptions['subscribed'] ) ); ?></strong></div>
 			<div class="nck-card"><span><?php esc_html_e( 'Pending confirmation', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $subscriptions['pending'] ) ); ?></strong></div>
 			<div class="nck-card"><span><?php esc_html_e( 'New confirmations (30 days)', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $subscriptions['confirmed_30d'] ) ); ?></strong></div>
 			<div class="nck-card"><span><?php esc_html_e( 'Unsubscribed', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $subscriptions['unsubscribed'] ) ); ?></strong></div>
 		</div></section>
 
-		<div class="nck-layout">
+		<div id="nck-report-engagement" class="nck-layout nck-report-section">
 			<section class="nck-panel"><h2><?php esc_html_e( 'Acquisition cohorts', 'newsletter-campaign-kit' ); ?></h2><p><?php esc_html_e( 'Subscribers grouped by their registration month; status columns reflect their current state.', 'newsletter-campaign-kit' ); ?></p><div class="nck-table-wrap"><table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Month', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Acquired', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Active now', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Unsubscribed now', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody><?php if ( empty( $subscription_breakdowns['monthly'] ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No acquisition data yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?><?php foreach ( $subscription_breakdowns['monthly'] as $cohort ) : ?><tr><td><?php echo esc_html( $cohort['cohort'] ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $cohort['acquired'] ) ) ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $cohort['active_now'] ) ) ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $cohort['unsubscribed_now'] ) ) ); ?></td></tr><?php endforeach; ?></tbody></table></div></section>
 			<section class="nck-panel"><h2><?php esc_html_e( 'Acquisition sources', 'newsletter-campaign-kit' ); ?></h2><div class="nck-table-wrap"><table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Source', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Acquired', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Active now', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Unsubscribed now', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody><?php if ( empty( $subscription_breakdowns['sources'] ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No source data yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?><?php foreach ( $subscription_breakdowns['sources'] as $source ) : ?><tr><td><code><?php echo esc_html( $source['acquisition_source'] ); ?></code></td><td><?php echo esc_html( number_format_i18n( absint( $source['acquired'] ) ) ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $source['active_now'] ) ) ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $source['unsubscribed_now'] ) ) ); ?></td></tr><?php endforeach; ?></tbody></table></div></section>
 		</div>
@@ -466,7 +469,7 @@ function newsletter_campaign_kit_render_reports_page() {
 			</section>
 		</div>
 
-		<section class="nck-panel">
+		<section id="nck-report-campaigns" class="nck-panel nck-report-section">
 		<h2><?php esc_html_e( 'Campaign details', 'newsletter-campaign-kit' ); ?></h2>
 		<p><?php echo esc_html( sprintf( _n( '%d campaign matches the current filters.', '%d campaigns match the current filters.', $report_total, 'newsletter-campaign-kit' ), $report_total ) ); ?></p>
 		<div class="nck-table-wrap"><table class="widefat fixed striped">

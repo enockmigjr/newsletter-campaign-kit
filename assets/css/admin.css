@@ -451,6 +451,318 @@
 	width: 100%;
 }
 
+.newsletter-campaign-kit-admin .nck-eyebrow {
+	display: block;
+	margin: 0 0 7px;
+	color: #8a6500;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.newsletter-campaign-kit-admin .nck-review-header,
+.newsletter-campaign-kit-admin .nck-report-hero {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 28px;
+	margin: 20px 0 24px;
+	border-bottom: 1px solid #c3c4c7;
+	padding: 20px 0 24px;
+}
+
+.newsletter-campaign-kit-admin .nck-review-header h1,
+.newsletter-campaign-kit-admin .nck-report-hero h1 {
+	margin: 4px 0 8px;
+	font-size: 32px;
+	line-height: 1.15;
+}
+
+.newsletter-campaign-kit-admin .nck-review-header p,
+.newsletter-campaign-kit-admin .nck-report-hero p {
+	max-width: 760px;
+	margin: 0;
+	color: #50575e;
+	font-size: 15px;
+	line-height: 1.55;
+}
+
+.newsletter-campaign-kit-admin .nck-review-header__actions {
+	display: flex;
+	flex: none;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	justify-content: flex-end;
+}
+
+.newsletter-campaign-kit-admin .nck-back-link {
+	display: inline-block;
+	margin-bottom: 18px;
+	text-decoration: none;
+}
+
+.newsletter-campaign-kit-admin .nck-status {
+	display: inline-flex;
+	min-height: 30px;
+	align-items: center;
+	border: 1px solid #b8c2bc;
+	border-radius: 999px;
+	background: #edf6f0;
+	padding: 0 11px;
+	color: #145c3c;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.newsletter-campaign-kit-admin .nck-review-metrics {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	margin: 0 0 20px;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+}
+
+.newsletter-campaign-kit-admin .nck-review-metrics > div {
+	min-width: 0;
+	border-right: 1px solid #dcdcde;
+	padding: 18px 20px;
+}
+
+.newsletter-campaign-kit-admin .nck-review-metrics > div:last-child {
+	border-right: 0;
+}
+
+.newsletter-campaign-kit-admin .nck-review-metrics span,
+.newsletter-campaign-kit-admin .nck-review-metrics strong {
+	display: block;
+}
+
+.newsletter-campaign-kit-admin .nck-review-metrics span {
+	color: #646970;
+	font-size: 12px;
+	text-transform: uppercase;
+}
+
+.newsletter-campaign-kit-admin .nck-review-metrics strong {
+	margin-top: 6px;
+	font-size: 26px;
+}
+
+.newsletter-campaign-kit-admin .nck-review-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+	gap: 18px;
+	align-items: start;
+}
+
+.newsletter-campaign-kit-admin .nck-review-layout .nck-panel {
+	margin: 0;
+}
+
+.newsletter-campaign-kit-admin .nck-review-summary dl {
+	margin: 18px 0 0;
+}
+
+.newsletter-campaign-kit-admin .nck-review-summary dl > div {
+	display: grid;
+	grid-template-columns: minmax(120px, 0.4fr) 1fr;
+	gap: 16px;
+	border-top: 1px solid #e2e4e7;
+	padding: 13px 0;
+}
+
+.newsletter-campaign-kit-admin .nck-review-summary dt {
+	color: #646970;
+}
+
+.newsletter-campaign-kit-admin .nck-review-summary dd {
+	margin: 0;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.newsletter-campaign-kit-admin .nck-immutable-note {
+	margin: 18px 0;
+	border-left: 3px solid #dba617;
+	background: #f8f4e8;
+	padding: 14px 16px;
+}
+
+.newsletter-campaign-kit-admin .nck-immutable-note p {
+	margin-bottom: 0;
+}
+
+.newsletter-campaign-kit-admin .nck-review-action {
+	display: grid;
+	gap: 12px;
+	margin-top: 18px;
+	border-top: 1px solid #dcdcde;
+	padding-top: 18px;
+}
+
+.newsletter-campaign-kit-admin .nck-review-action label {
+	display: grid;
+	gap: 7px;
+	font-weight: 600;
+}
+
+.newsletter-campaign-kit-admin .nck-recurrence-options {
+	border: 1px solid #dcdcde;
+	background: #f6f7f7;
+	padding: 12px 14px;
+}
+
+.newsletter-campaign-kit-admin .nck-recurrence-options summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.newsletter-campaign-kit-admin .nck-recurrence-options label {
+	margin-top: 12px;
+}
+
+.newsletter-campaign-kit-admin .nck-check-list {
+	display: grid;
+	max-height: 260px;
+	gap: 0;
+	overflow: auto;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	padding: 4px;
+}
+
+.newsletter-campaign-kit-admin .nck-check-list label {
+	display: flex;
+	gap: 9px;
+	align-items: center;
+	padding: 8px 10px;
+}
+
+.newsletter-campaign-kit-admin .nck-check-list label:hover {
+	background: #f0f6fc;
+}
+
+.newsletter-campaign-kit-admin .nck-bulk-picker {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 14px;
+}
+
+.newsletter-campaign-kit-admin .nck-inline-actions form {
+	margin: 0;
+}
+
+.newsletter-campaign-kit-admin .nck-danger-button {
+	border-color: #d63638;
+	color: #b32d2e;
+}
+
+.newsletter-campaign-kit-admin .nck-topic-guide,
+.newsletter-campaign-kit-admin .nck-report-filter-panel {
+	display: grid;
+	grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr);
+	gap: 24px;
+	margin: 26px 0 16px;
+	border-top: 1px solid #c3c4c7;
+	border-bottom: 1px solid #c3c4c7;
+	padding: 22px 0;
+}
+
+.newsletter-campaign-kit-admin .nck-topic-guide h2,
+.newsletter-campaign-kit-admin .nck-report-filter-panel h2 {
+	margin: 0;
+}
+
+.newsletter-campaign-kit-admin .nck-topic-guide p,
+.newsletter-campaign-kit-admin .nck-report-filter-panel p {
+	margin: 0;
+	color: #50575e;
+	font-size: 14px;
+	line-height: 1.65;
+}
+
+.newsletter-campaign-kit-admin .nck-report-filter-panel {
+	grid-template-columns: minmax(220px, 0.32fr) minmax(0, 1fr);
+	align-items: end;
+}
+
+.newsletter-campaign-kit-admin .nck-report-filter-panel .nck-report-filters {
+	margin: 0;
+}
+
+.newsletter-campaign-kit-admin .nck-report-nav {
+	display: flex;
+	gap: 4px;
+	margin: -8px 0 18px;
+	border-bottom: 1px solid #c3c4c7;
+	overflow-x: auto;
+}
+
+.newsletter-campaign-kit-admin .nck-report-nav a {
+	flex: none;
+	border-bottom: 3px solid transparent;
+	padding: 11px 14px;
+	color: #2c3338;
+	text-decoration: none;
+}
+
+.newsletter-campaign-kit-admin .nck-report-nav a:hover,
+.newsletter-campaign-kit-admin .nck-report-nav a:focus {
+	border-bottom-color: #dba617;
+	color: #135e96;
+}
+
+.newsletter-campaign-kit-admin .nck-report-section {
+	scroll-margin-top: 46px;
+	margin-top: 28px;
+}
+
+.newsletter-campaign-kit-admin .nck-metric-grid .nck-card {
+	border-top: 3px solid #1f6f54;
+}
+
+.newsletter-campaign-kit-admin .nck-row-details summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.newsletter-campaign-kit-admin .nck-row-details dl {
+	min-width: 220px;
+	margin-bottom: 0;
+}
+
+.newsletter-campaign-kit-admin .nck-row-details dt {
+	margin-top: 8px;
+	color: #646970;
+	font-size: 11px;
+	text-transform: uppercase;
+}
+
+.newsletter-campaign-kit-admin .nck-row-details dd {
+	margin: 2px 0 0;
+	overflow-wrap: anywhere;
+}
+
+.nck-confirm-dialog {
+	width: min(480px, calc(100vw - 32px));
+}
+
+.nck-confirm-dialog__actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 24px;
+}
+
+.newsletter-campaign-kit-admin .wp-editor-wrap {
+	max-width: 100%;
+}
+
+.newsletter-campaign-kit-admin .wp-editor-container {
+	background: #fff;
+}
+
 @media (max-width: 782px) {
 	.nck-admin-dialog {
 		width: calc(100vw - 20px);
@@ -463,5 +775,31 @@
 
 	.nck-report-filters {
 		grid-template-columns: 1fr;
+	}
+
+	.newsletter-campaign-kit-admin .nck-review-header,
+	.newsletter-campaign-kit-admin .nck-report-hero {
+		flex-direction: column;
+	}
+
+	.newsletter-campaign-kit-admin .nck-review-header__actions {
+		justify-content: flex-start;
+	}
+
+	.newsletter-campaign-kit-admin .nck-review-metrics,
+	.newsletter-campaign-kit-admin .nck-review-layout,
+	.newsletter-campaign-kit-admin .nck-bulk-picker,
+	.newsletter-campaign-kit-admin .nck-topic-guide,
+	.newsletter-campaign-kit-admin .nck-report-filter-panel {
+		grid-template-columns: 1fr;
+	}
+
+	.newsletter-campaign-kit-admin .nck-review-metrics > div {
+		border-right: 0;
+		border-bottom: 1px solid #dcdcde;
+	}
+
+	.newsletter-campaign-kit-admin .nck-review-metrics > div:last-child {
+		border-bottom: 0;
 	}
 }

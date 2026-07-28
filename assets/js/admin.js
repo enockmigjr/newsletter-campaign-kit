@@ -22,6 +22,16 @@
 		form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function(button) {
 			button.disabled = busy;
 			button.classList.toggle('is-busy', busy);
+			button.toggleAttribute('aria-busy', busy);
+			if (button instanceof HTMLInputElement) {
+				if (busy) {
+					button.dataset.nckIdleValue = button.value;
+					button.value = 'Traitement...';
+				} else if (button.dataset.nckIdleValue) {
+					button.value = button.dataset.nckIdleValue;
+					delete button.dataset.nckIdleValue;
+				}
+			}
 		});
 	}
 
@@ -55,8 +65,74 @@
 		return notice ? notice.textContent.trim() : 'Changes saved.';
 	}
 
+	function confirmAction(message) {
+		let dialog = document.querySelector('[data-nck-confirm-dialog]');
+		if (!dialog) {
+			dialog = document.createElement('dialog');
+			dialog.className = 'nck-admin-dialog nck-confirm-dialog';
+			dialog.dataset.nckConfirmDialog = '';
+			dialog.innerHTML = '<div class="nck-admin-dialog__body"><h2>Confirmer l\u2019action</h2><p data-nck-confirm-message></p><div class="nck-confirm-dialog__actions"><button type="button" class="button" data-nck-confirm-cancel>Annuler</button><button type="button" class="button button-primary" data-nck-confirm-accept>Confirmer</button></div></div>';
+			document.body.appendChild(dialog);
+		}
+		dialog.querySelector('[data-nck-confirm-message]').textContent = message;
+		dialog.showModal();
+
+		return new Promise(function(resolve) {
+			const cancel = dialog.querySelector('[data-nck-confirm-cancel]');
+			const accept = dialog.querySelector('[data-nck-confirm-accept]');
+			function finish(value) {
+				cancel.removeEventListener('click', reject);
+				accept.removeEventListener('click', approve);
+				dialog.removeEventListener('cancel', reject);
+				dialog.close();
+				resolve(value);
+			}
+			function reject(event) {
+				if (event) event.preventDefault();
+				finish(false);
+			}
+			function approve() {
+				finish(true);
+			}
+			cancel.addEventListener('click', reject);
+			accept.addEventListener('click', approve);
+			dialog.addEventListener('cancel', reject);
+		});
+	}
+
+	function removeEditors(root) {
+		if (!window.wp || !wp.editor || typeof wp.editor.remove !== 'function') return;
+		root.querySelectorAll('textarea[data-nck-rich-editor]').forEach(function(textarea) {
+			if (textarea.id) {
+				try {
+					wp.editor.remove(textarea.id);
+				} catch (error) {
+					// The editor may not have been initialized on this surface.
+				}
+			}
+		});
+	}
+
+	function initializeEditors(root) {
+		if (!window.wp || !wp.editor || typeof wp.editor.initialize !== 'function') return;
+		root.querySelectorAll('textarea[data-nck-rich-editor]').forEach(function(textarea) {
+			if (!textarea.id || textarea.dataset.nckEditorBound === '1') return;
+			textarea.dataset.nckEditorBound = '1';
+			wp.editor.initialize(textarea.id, {
+				tinymce: {
+					wpautop: true,
+					toolbar1: 'formatselect,bold,italic,bullist,numlist,blockquote,alignleft,aligncenter,alignright,link,unlink,undo,redo',
+					toolbar2: 'forecolor,removeformat,charmap,outdent,indent,wp_help'
+				},
+				quicktags: true,
+				mediaButtons: false
+			});
+		});
+	}
+
 	function initializeSurface(root) {
 		const scope = root || document;
+		initializeEditors(scope);
 		const autoOpen = scope.querySelector('[data-nck-dialog-auto-open]');
 		if (autoOpen && typeof autoOpen.showModal === 'function' && !autoOpen.open) autoOpen.showModal();
 		scope.querySelectorAll('[data-nck-source-select]').forEach(function(select) {
@@ -95,6 +171,17 @@
 			}
 			syncContentItems();
 		});
+		scope.querySelectorAll('[data-nck-check-filter]').forEach(function(input) {
+			const list = document.getElementById(input.dataset.nckCheckFilter);
+			if (!list || input.dataset.nckCheckFilterBound === '1') return;
+			input.dataset.nckCheckFilterBound = '1';
+			input.addEventListener('input', function() {
+				const query = input.value.trim().toLowerCase();
+				list.querySelectorAll('label').forEach(function(option) {
+					option.hidden = query && option.textContent.toLowerCase().indexOf(query) === -1;
+				});
+			});
+		});
 	}
 
 	async function updateSurface(url, options, historyMode) {
@@ -108,6 +195,7 @@
 			if (!response.ok || !next || !current) {
 				throw new Error('The administration screen could not be refreshed.');
 			}
+			removeEditors(current);
 			current.replaceWith(next);
 			if (documentResult.title) document.title = documentResult.title;
 			if (historyMode === 'push') {
@@ -127,6 +215,13 @@
 		if (!(form instanceof HTMLFormElement) || !form.closest('.newsletter-campaign-kit-admin') || form.target) return;
 		event.preventDefault();
 		if (form.dataset.nckSubmitting === 'true') return;
+		if (form.dataset.nckConfirm) {
+			const confirmed = await confirmAction(form.dataset.nckConfirm);
+			if (!confirmed) return;
+		}
+		if (window.tinyMCE && typeof window.tinyMCE.triggerSave === 'function') {
+			window.tinyMCE.triggerSave();
+		}
 		setBusy(form, true);
 		const method = (form.method || 'GET').toUpperCase();
 		try {

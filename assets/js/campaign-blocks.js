@@ -5,6 +5,12 @@
 		if ( ! field || ! content ) {
 			return;
 		}
+		var editor = window.tinyMCE && window.tinyMCE.get( field.id );
+		if ( editor && ! editor.isHidden() ) {
+			editor.execCommand( 'mceInsertContent', false, content );
+			editor.save();
+			return;
+		}
 		var start = Number.isInteger( field.selectionStart ) ? field.selectionStart : field.value.length;
 		var end = Number.isInteger( field.selectionEnd ) ? field.selectionEnd : start;
 		var prefix = start > 0 && field.value.charAt( start - 1 ) !== '\n' ? '\n\n' : '';

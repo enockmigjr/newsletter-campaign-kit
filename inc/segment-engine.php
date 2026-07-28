@@ -149,7 +149,7 @@ function newsletter_campaign_kit_get_segment( $segment_id, $include_archived = f
 	return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d AND status = %s LIMIT 1", $segment_id, 'active' ), ARRAY_A );
 }
 
-function newsletter_campaign_kit_get_topics( $limit = 0, $offset = 0 ) {
+function newsletter_campaign_kit_get_topics( $limit = 0, $offset = 0, $include_archived = false ) {
 	global $wpdb;
 
 	if ( ! newsletter_campaign_kit_dynamic_tables_exist() ) {
@@ -159,7 +159,8 @@ function newsletter_campaign_kit_get_topics( $limit = 0, $offset = 0 ) {
 	$table  = newsletter_campaign_kit_get_topics_table();
 	$limit  = absint( $limit );
 	$offset = absint( $offset );
-	$sql    = "SELECT * FROM {$table} WHERE status = 'active' ORDER BY name ASC";
+	$where  = $include_archived ? '' : " WHERE status = 'active'";
+	$sql    = "SELECT * FROM {$table}{$where} ORDER BY name ASC";
 	if ( $limit ) {
 		$sql = $wpdb->prepare( $sql . ' LIMIT %d OFFSET %d', min( 100, $limit ), $offset );
 	}
@@ -167,7 +168,7 @@ function newsletter_campaign_kit_get_topics( $limit = 0, $offset = 0 ) {
 	return $wpdb->get_results( $sql, ARRAY_A );
 }
 
-function newsletter_campaign_kit_count_topics() {
+function newsletter_campaign_kit_count_topics( $include_archived = false ) {
 	global $wpdb;
 
 	if ( ! newsletter_campaign_kit_dynamic_tables_exist() ) {
@@ -175,7 +176,8 @@ function newsletter_campaign_kit_count_topics() {
 	}
 
 	$table = newsletter_campaign_kit_get_topics_table();
-	return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status = 'active'" );
+	$where = $include_archived ? '' : " WHERE status = 'active'";
+	return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}{$where}" );
 }
 
 function newsletter_campaign_kit_record_is_active( $table, $record_id ) {
@@ -405,7 +407,7 @@ function newsletter_campaign_kit_handle_create_segment() {
 	check_admin_referer( 'newsletter_campaign_kit_create_segment' );
 
 	$result = newsletter_campaign_kit_create_segment( newsletter_campaign_kit_get_segment_input_from_request() );
-	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&segment=' . ( is_wp_error( $result ) ? 'invalid' : 'created' ) ) );
+	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&segment=' . ( is_wp_error( $result ) ? sanitize_key( $result->get_error_code() ) : 'created' ) . '&segment_page=1#nck-segments' ) );
 	exit;
 }
 add_action( 'admin_post_newsletter_campaign_kit_create_segment', 'newsletter_campaign_kit_handle_create_segment' );
@@ -494,44 +496,62 @@ function newsletter_campaign_kit_handle_update_assignment() {
 
 	check_admin_referer( 'newsletter_campaign_kit_update_assignment' );
 
-	$subscriber_id = isset( $_POST['subscriber_id'] ) ? absint( $_POST['subscriber_id'] ) : 0;
-	$audience      = isset( $_POST['audience'] ) ? sanitize_text_field( wp_unslash( $_POST['audience'] ) ) : '';
-	$operation     = isset( $_POST['assignment_operation'] ) ? sanitize_key( wp_unslash( $_POST['assignment_operation'] ) ) : '';
-	if ( ! $subscriber_id || ! in_array( $operation, array( 'add', 'remove' ), true ) || ! preg_match( '/^(list|tag):(\d+)$/', $audience, $matches ) ) {
+	$subscriber_ids = isset( $_POST['subscriber_ids'] ) ? array_values( array_unique( array_filter( array_map( 'absint', (array) wp_unslash( $_POST['subscriber_ids'] ) ) ) ) ) : array();
+	$audiences      = isset( $_POST['audiences'] ) ? array_values( array_unique( array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['audiences'] ) ) ) ) : array();
+	if ( ! $subscriber_ids && isset( $_POST['subscriber_id'] ) ) {
+		$subscriber_ids[] = absint( $_POST['subscriber_id'] );
+	}
+	if ( ! $audiences && isset( $_POST['audience'] ) ) {
+		$audiences[] = sanitize_text_field( wp_unslash( $_POST['audience'] ) );
+	}
+	$operation = isset( $_POST['assignment_operation'] ) ? sanitize_key( wp_unslash( $_POST['assignment_operation'] ) ) : '';
+	if ( ! $subscriber_ids || ! $audiences || count( $subscriber_ids ) > 100 || count( $subscriber_ids ) * count( $audiences ) > 1000 || ! in_array( $operation, array( 'add', 'remove' ), true ) ) {
 		wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&assignment=invalid' ) );
 		exit;
 	}
 
 	global $wpdb;
-	$subscriber_exists = $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM ' . newsletter_campaign_kit_get_subscribers_table() . ' WHERE id = %d LIMIT 1', $subscriber_id ) );
-	$audience_id       = absint( $matches[2] );
-	$is_list           = 'list' === $matches[1];
-	$audience_table    = $is_list ? newsletter_campaign_kit_get_lists_table() : newsletter_campaign_kit_get_tags_table();
-	$audience_exists   = $is_list
-		? newsletter_campaign_kit_record_is_active( $audience_table, $audience_id )
-		: (bool) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$audience_table} WHERE id = %d LIMIT 1", $audience_id ) );
-
-	if ( ! $subscriber_exists || ! $audience_exists ) {
+	$subscriber_placeholders = implode( ',', array_fill( 0, count( $subscriber_ids ), '%d' ) );
+	$existing_subscribers    = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . newsletter_campaign_kit_get_subscribers_table() . " WHERE id IN ({$subscriber_placeholders})", $subscriber_ids ) );
+	if ( count( $existing_subscribers ) !== count( $subscriber_ids ) ) {
 		wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-segments&assignment=invalid' ) );
 		exit;
 	}
 
-	$map_table = $is_list ? newsletter_campaign_kit_get_subscriber_lists_table() : newsletter_campaign_kit_get_subscriber_tags_table();
-	$key       = $is_list ? 'list_id' : 'tag_id';
-	if ( 'remove' === $operation ) {
-		$ok = false !== $wpdb->delete( $map_table, array( 'subscriber_id' => $subscriber_id, $key => $audience_id ), array( '%d', '%d' ) );
-	} else {
-		$ok = $is_list
-			? newsletter_campaign_kit_assign_subscriber_to_list( $subscriber_id, $audience_id )
-			: newsletter_campaign_kit_assign_subscriber_to_tag( $subscriber_id, $audience_id );
+	$operations = 0;
+	$ok         = true;
+	foreach ( $audiences as $audience ) {
+		if ( ! preg_match( '/^(list|tag):(\d+)$/', $audience, $matches ) ) {
+			$ok = false;
+			break;
+		}
+		$audience_id     = absint( $matches[2] );
+		$is_list         = 'list' === $matches[1];
+		$audience_table  = $is_list ? newsletter_campaign_kit_get_lists_table() : newsletter_campaign_kit_get_tags_table();
+		$audience_exists = $is_list
+			? newsletter_campaign_kit_record_is_active( $audience_table, $audience_id )
+			: (bool) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$audience_table} WHERE id = %d LIMIT 1", $audience_id ) );
+		if ( ! $audience_exists ) {
+			$ok = false;
+			break;
+		}
+		$map_table = $is_list ? newsletter_campaign_kit_get_subscriber_lists_table() : newsletter_campaign_kit_get_subscriber_tags_table();
+		$key       = $is_list ? 'list_id' : 'tag_id';
+		foreach ( $subscriber_ids as $subscriber_id ) {
+			$changed = 'remove' === $operation
+				? false !== $wpdb->delete( $map_table, array( 'subscriber_id' => $subscriber_id, $key => $audience_id ), array( '%d', '%d' ) )
+				: ( $is_list ? newsletter_campaign_kit_assign_subscriber_to_list( $subscriber_id, $audience_id ) : newsletter_campaign_kit_assign_subscriber_to_tag( $subscriber_id, $audience_id ) );
+			$ok      = $ok && $changed;
+			++$operations;
+		}
 	}
 
 	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
 		newsletter_campaign_kit_log_event(
 			$ok ? 'newsletter_assignment_updated' : 'newsletter_assignment_failed',
 			$ok ? 'success' : 'failure',
-			$subscriber_id,
-			array( 'audience_type' => $matches[1], 'audience_id' => $audience_id, 'operation' => $operation )
+			0,
+			array( 'subscriber_count' => count( $subscriber_ids ), 'audience_count' => count( $audiences ), 'operations' => $operations, 'operation' => $operation )
 		);
 	}
 

@@ -144,6 +144,71 @@ function newsletter_campaign_kit_get_subscription_report_totals() {
 	return array_map( 'absint', wp_parse_args( is_array( $row ) ? $row : array(), $empty ) );
 }
 
+/** Return privacy-bounded cross-campaign engagement breakdowns. */
+function newsletter_campaign_kit_get_engagement_breakdowns() {
+	global $wpdb;
+
+	$empty  = array( 'timeline' => array(), 'links' => array(), 'devices' => array(), 'topics' => array() );
+	$events = newsletter_campaign_kit_get_tracking_events_table();
+	if ( ! newsletter_campaign_kit_table_exists( $events ) ) {
+		return $empty;
+	}
+	$cutoff   = gmdate( 'Y-m-d H:i:s', time() - ( 30 * DAY_IN_SECONDS ) );
+	$timeline = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT DATE(created_at) AS event_day,
+				SUM(CASE WHEN event_type = 'open' THEN 1 ELSE 0 END) AS opens,
+				SUM(CASE WHEN event_type = 'click' THEN 1 ELSE 0 END) AS clicks,
+				SUM(CASE WHEN event_type = 'conversion' THEN 1 ELSE 0 END) AS conversions
+			FROM {$events} WHERE is_bot = 0 AND created_at >= %s
+			GROUP BY DATE(created_at) ORDER BY event_day ASC",
+			$cutoff
+		),
+		ARRAY_A
+	);
+	$links = $wpdb->get_results(
+		"SELECT destination_url, destination_hash, event_label, COUNT(DISTINCT queue_id) AS unique_clicks, COUNT(*) AS total_clicks
+		FROM {$events} WHERE event_type = 'click' AND is_bot = 0
+		GROUP BY destination_hash, destination_url, event_label
+		ORDER BY unique_clicks DESC, total_clicks DESC LIMIT 10",
+		ARRAY_A
+	);
+	$devices = array( 'mobile' => 0, 'tablet' => 0, 'desktop' => 0, 'unknown' => 0 );
+	foreach ( $wpdb->get_col( "SELECT user_agent FROM {$events} WHERE is_bot = 0 AND user_agent IS NOT NULL AND user_agent <> ''" ) as $user_agent ) {
+		$user_agent = strtolower( (string) $user_agent );
+		if ( preg_match( '/ipad|tablet|kindle/', $user_agent ) ) {
+			++$devices['tablet'];
+		} elseif ( preg_match( '/mobile|iphone|android/', $user_agent ) ) {
+			++$devices['mobile'];
+		} elseif ( preg_match( '/windows|macintosh|linux|x11/', $user_agent ) ) {
+			++$devices['desktop'];
+		} else {
+			++$devices['unknown'];
+		}
+	}
+	$topics = array();
+	if ( newsletter_campaign_kit_audience_snapshot_tables_exist() ) {
+		$snapshots = newsletter_campaign_kit_get_audience_snapshots_table();
+		$topics    = $wpdb->get_results(
+			"SELECT COALESCE(NULLIF(sn.topic_label, ''), 'General') AS topic_label,
+				COUNT(DISTINCT CASE WHEN e.event_type = 'open' AND e.is_bot = 0 THEN e.queue_id END) AS unique_opens,
+				COUNT(DISTINCT CASE WHEN e.event_type = 'click' AND e.is_bot = 0 THEN e.queue_id END) AS unique_clicks,
+				COUNT(DISTINCT CASE WHEN e.event_type = 'conversion' AND e.is_bot = 0 THEN e.queue_id END) AS conversions
+			FROM {$events} e LEFT JOIN {$snapshots} sn ON sn.campaign_id = e.campaign_id
+			GROUP BY COALESCE(NULLIF(sn.topic_label, ''), 'General')
+			ORDER BY unique_clicks DESC, unique_opens DESC LIMIT 12",
+			ARRAY_A
+		);
+	}
+
+	return array(
+		'timeline' => is_array( $timeline ) ? $timeline : array(),
+		'links'    => is_array( $links ) ? $links : array(),
+		'devices'  => $devices,
+		'topics'   => is_array( $topics ) ? $topics : array(),
+	);
+}
+
 function newsletter_campaign_kit_register_reports_menu() {
 	add_submenu_page(
 		'newsletter-campaign-kit',
@@ -164,6 +229,7 @@ function newsletter_campaign_kit_render_reports_page() {
 	$reports = newsletter_campaign_kit_get_campaign_reports();
 	$totals  = newsletter_campaign_kit_get_campaign_report_totals();
 	$subscriptions = newsletter_campaign_kit_get_subscription_report_totals();
+	$breakdowns    = newsletter_campaign_kit_get_engagement_breakdowns();
 	?>
 	<div class="wrap newsletter-campaign-kit-admin">
 		<h1><?php esc_html_e( 'Campaign reports', 'newsletter-campaign-kit' ); ?></h1>
@@ -186,6 +252,38 @@ function newsletter_campaign_kit_render_reports_page() {
 			<div class="nck-card"><span><?php esc_html_e( 'New confirmations (30 days)', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $subscriptions['confirmed_30d'] ) ); ?></strong></div>
 			<div class="nck-card"><span><?php esc_html_e( 'Unsubscribed', 'newsletter-campaign-kit' ); ?></span><strong><?php echo esc_html( number_format_i18n( $subscriptions['unsubscribed'] ) ); ?></strong></div>
 		</div></section>
+
+		<div class="nck-layout">
+			<section class="nck-panel">
+				<h2><?php esc_html_e( 'Engagement over 30 days', 'newsletter-campaign-kit' ); ?></h2>
+				<div class="nck-table-wrap"><table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Day', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Opens', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Clicks', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Conversions', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
+				<?php if ( empty( $breakdowns['timeline'] ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No observed engagement in this period.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
+				<?php foreach ( $breakdowns['timeline'] as $day ) : ?><tr><td><?php echo esc_html( $day['event_day'] ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $day['opens'] ) ) ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $day['clicks'] ) ) ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $day['conversions'] ) ) ); ?></td></tr><?php endforeach; ?>
+				</tbody></table></div>
+			</section>
+			<section class="nck-panel">
+				<h2><?php esc_html_e( 'Approximate devices', 'newsletter-campaign-kit' ); ?></h2>
+				<p><?php esc_html_e( 'Derived from privacy-limited user-agent data and therefore approximate.', 'newsletter-campaign-kit' ); ?></p>
+				<div class="nck-grid"><?php foreach ( $breakdowns['devices'] as $device => $count ) : ?><div class="nck-card"><span><?php echo esc_html( ucfirst( $device ) ); ?></span><strong><?php echo esc_html( number_format_i18n( $count ) ); ?></strong></div><?php endforeach; ?></div>
+			</section>
+		</div>
+
+		<div class="nck-layout">
+			<section class="nck-panel">
+				<h2><?php esc_html_e( 'Most clicked links', 'newsletter-campaign-kit' ); ?></h2>
+				<div class="nck-table-wrap"><table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Destination', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Unique clicks', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Total', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
+				<?php if ( empty( $breakdowns['links'] ) ) : ?><tr><td colspan="3"><?php esc_html_e( 'No clicked link yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
+				<?php foreach ( $breakdowns['links'] as $link ) : ?><tr><td><strong><?php echo esc_html( $link['event_label'] ?: __( 'Link', 'newsletter-campaign-kit' ) ); ?></strong><br><small><?php echo esc_html( $link['destination_url'] ?: substr( (string) $link['destination_hash'], 0, 16 ) . '...' ); ?></small></td><td><?php echo esc_html( number_format_i18n( absint( $link['unique_clicks'] ) ) ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $link['total_clicks'] ) ) ); ?></td></tr><?php endforeach; ?>
+				</tbody></table></div>
+			</section>
+			<section class="nck-panel">
+				<h2><?php esc_html_e( 'Engagement by topic', 'newsletter-campaign-kit' ); ?></h2>
+				<div class="nck-table-wrap"><table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Topic', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Opens', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Clicks', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Conversions', 'newsletter-campaign-kit' ); ?></th></tr></thead><tbody>
+				<?php if ( empty( $breakdowns['topics'] ) ) : ?><tr><td colspan="4"><?php esc_html_e( 'No topic engagement yet.', 'newsletter-campaign-kit' ); ?></td></tr><?php endif; ?>
+				<?php foreach ( $breakdowns['topics'] as $topic ) : ?><tr><td><?php echo esc_html( $topic['topic_label'] ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $topic['unique_opens'] ) ) ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $topic['unique_clicks'] ) ) ); ?></td><td><?php echo esc_html( number_format_i18n( absint( $topic['conversions'] ) ) ); ?></td></tr><?php endforeach; ?>
+				</tbody></table></div>
+			</section>
+		</div>
 
 		<table class="widefat fixed striped">
 			<thead><tr><th><?php esc_html_e( 'Campaign', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Status', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Audience snapshot', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Sent', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Delivery', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Open', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Click', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Click / open', 'newsletter-campaign-kit' ); ?></th><th><?php esc_html_e( 'Conversion', 'newsletter-campaign-kit' ); ?></th></tr></thead>

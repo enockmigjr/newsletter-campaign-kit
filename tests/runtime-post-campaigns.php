@@ -84,6 +84,19 @@ try {
 	$dynamic_body     = newsletter_campaign_kit_resolve_dynamic_campaign_body( $dynamic_campaign );
 	newsletter_post_runtime_assert( false !== strpos( $dynamic_body, get_the_title( $post_id ) ), 'Dynamic articles were missing from the resolved preview body.' );
 	newsletter_post_runtime_assert( 'text_only' === newsletter_campaign_kit_get_campaign_source_config( $dynamic_campaign )['layout'], 'The selected article layout was not persisted.' );
+	newsletter_post_runtime_assert( 10 === count( newsletter_campaign_kit_get_content_source_layouts() ), 'The article layout catalogue is incomplete.' );
+	$invalid_category = newsletter_campaign_kit_prepare_campaign_data(
+		array(
+			'title'             => 'Invalid category source',
+			'subject'           => 'Invalid category source',
+			'html_body'         => '<p>Content</p>',
+			'target_audience'   => 'all',
+			'source_type'       => 'category_posts',
+			'source_post_type'  => 'post',
+			'source_category_id' => 0,
+		)
+	);
+	newsletter_post_runtime_assert( is_wp_error( $invalid_category ) && 'newsletter_invalid_source_category' === $invalid_category->get_error_code(), 'Invalid category sources do not expose a precise error.' );
 
 	echo wp_json_encode(
 		array(
@@ -91,6 +104,8 @@ try {
 			'post_campaign_draft'   => true,
 			'dynamic_preview'       => true,
 			'article_layout'        => true,
+			'layout_catalogue'      => 10,
+			'creation_errors'       => 'specific',
 			'idempotent'            => true,
 		)
 	);

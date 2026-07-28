@@ -460,7 +460,20 @@ function newsletter_campaign_kit_handle_preview() {
 	header( 'X-Frame-Options: DENY' );
 	header( 'X-Robots-Tag: noindex, nofollow' );
 	$text_body = '' !== trim( $content['text_body'] ) ? $content['text_body'] : newsletter_campaign_kit_html_to_text( $content['html_body'] );
-	?><!doctype html><html lang="<?php echo esc_attr( get_bloginfo( 'language' ) ); ?>"><head><meta charset="<?php bloginfo( 'charset' ); ?>"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?php echo esc_html( $content['subject'] ); ?></title><style>body{margin:0;background:#f0f0f1;color:#1d2327;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.shell{max-width:760px;margin:32px auto;background:#fff;border:1px solid #dcdcde}.meta{padding:20px 24px;border-bottom:1px solid #dcdcde}.meta p{margin:4px 0}.email{padding:32px}.plain{margin:24px;padding:20px;background:#f6f7f7;white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:800px){.shell{margin:0;border:0}.email{padding:20px}.plain{margin:16px}}</style></head><body><main class="shell"><header class="meta"><strong><?php echo esc_html( $content['subject'] ); ?></strong><p><?php echo esc_html( $content['preview_text'] ); ?></p></header><article class="email"><?php echo wp_kses_post( $content['html_body'] ); ?></article><section class="plain" aria-label="<?php esc_attr_e( 'Plain-text version', 'newsletter-campaign-kit' ); ?>"><?php echo esc_html( $text_body ); ?></section></main></body></html><?php
+	$text_mode = isset( $_GET['format'] ) && 'text' === sanitize_key( wp_unslash( $_GET['format'] ) );
+	$toggle_url = wp_nonce_url(
+		add_query_arg(
+			array(
+				'action' => 'newsletter_campaign_kit_preview',
+				'kind'   => $kind,
+				'id'     => $id,
+				'format' => $text_mode ? 'html' : 'text',
+			),
+			admin_url( 'admin-post.php' )
+		),
+		'newsletter_campaign_kit_preview_' . $kind . '_' . $id
+	);
+	?><!doctype html><html lang="<?php echo esc_attr( get_bloginfo( 'language' ) ); ?>"><head><meta charset="<?php bloginfo( 'charset' ); ?>"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?php echo esc_html( $content['subject'] ); ?></title><style>body{margin:0;background:#f0f0f1;color:#1d2327;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.shell{max-width:760px;margin:32px auto;background:#fff;border:1px solid #dcdcde}.meta{padding:20px 24px;border-bottom:1px solid #dcdcde}.meta p{margin:4px 0}.meta a{float:right}.email{padding:32px}.plain{margin:24px;padding:20px;background:#f6f7f7;white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:800px){.shell{margin:0;border:0}.email{padding:20px}.plain{margin:16px}}</style></head><body><main class="shell"><header class="meta"><a href="<?php echo esc_url( $toggle_url ); ?>"><?php echo $text_mode ? esc_html__( 'Visual version', 'newsletter-campaign-kit' ) : esc_html__( 'Text version', 'newsletter-campaign-kit' ); ?></a><strong><?php echo esc_html( $content['subject'] ); ?></strong><p><?php echo esc_html( $content['preview_text'] ); ?></p></header><?php if ( $text_mode ) : ?><section class="plain" aria-label="<?php esc_attr_e( 'Plain-text version', 'newsletter-campaign-kit' ); ?>"><?php echo esc_html( $text_body ); ?></section><?php else : ?><article class="email"><?php echo wp_kses_post( $content['html_body'] ); ?></article><?php endif; ?></main></body></html><?php
 	exit;
 }
 add_action( 'admin_post_newsletter_campaign_kit_preview', 'newsletter_campaign_kit_handle_preview' );

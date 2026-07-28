@@ -23,9 +23,16 @@ function newsletter_campaign_kit_get_content_source_types() {
 /** Return supported article layouts for dynamic campaign content. */
 function newsletter_campaign_kit_get_content_source_layouts() {
 	return array(
-		'editorial'   => __( 'Editorial: title, summary, then image', 'newsletter-campaign-kit' ),
-		'image_first' => __( 'Visual: image before the text', 'newsletter-campaign-kit' ),
-		'text_only'   => __( 'Text only: hide article images', 'newsletter-campaign-kit' ),
+		'editorial'     => __( 'Editorial: title, summary, then image', 'newsletter-campaign-kit' ),
+		'image_first'   => __( 'Visual: image before the text', 'newsletter-campaign-kit' ),
+		'compact_left'  => __( 'Compact: small image on the left', 'newsletter-campaign-kit' ),
+		'compact_right' => __( 'Compact: small image on the right', 'newsletter-campaign-kit' ),
+		'feature'       => __( 'Feature: large title and image', 'newsletter-campaign-kit' ),
+		'framed'        => __( 'Framed: bordered article card', 'newsletter-campaign-kit' ),
+		'minimal'       => __( 'Minimal: title, date and link', 'newsletter-campaign-kit' ),
+		'text_only'     => __( 'Text only: title and summary', 'newsletter-campaign-kit' ),
+		'image_only'    => __( 'Image focus: image and caption', 'newsletter-campaign-kit' ),
+		'bulletin'      => __( 'Bulletin: numbered compact entries', 'newsletter-campaign-kit' ),
 	);
 }
 
@@ -176,27 +183,47 @@ function newsletter_campaign_kit_render_campaign_source_posts( $posts, $layout =
 	}
 
 	$html = '<section><h2>' . esc_html__( 'Selected stories and works', 'newsletter-campaign-kit' ) . '</h2>';
-	foreach ( $posts as $post ) {
+	foreach ( $posts as $index => $post ) {
 		$title   = get_the_title( $post );
 		$url     = get_permalink( $post );
 		$excerpt = has_excerpt( $post ) ? get_the_excerpt( $post ) : wp_trim_words( wp_strip_all_tags( $post->post_content ), 34 );
 		$image   = get_the_post_thumbnail_url( $post, 'medium_large' );
 		$label   = 'media_item' === $post->post_type ? __( 'View the work', 'newsletter-campaign-kit' ) : __( 'Read the complete article', 'newsletter-campaign-kit' );
-		$html   .= '<article style="margin:28px 0;padding-top:24px;border-top:1px solid #e9e6df">';
-		$image_html = '';
-		if ( $image && 'text_only' !== $layout ) {
-			$image_html = '<p><a href="' . esc_url( $url ) . '"><img src="' . esc_url( $image ) . '" alt="" width="576" style="display:block;width:100%;height:auto;max-height:360px;object-fit:cover;border:0"></a></p>';
+		$date    = '<p style="margin:0 0 8px;font-size:12px;color:#686d68">' . esc_html( get_the_date( '', $post ) ) . '</p>';
+		$heading = '<h3 style="margin:0 0 10px"><a href="' . esc_url( $url ) . '" style="color:#171a17">' . esc_html( $title ) . '</a></h3>';
+		$summary = '<p style="margin:0 0 12px">' . esc_html( $excerpt ) . '</p>';
+		$action  = '<p style="margin:0"><a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a></p>';
+		$large_image = $image ? '<p style="margin:16px 0"><a href="' . esc_url( $url ) . '"><img src="' . esc_url( $image ) . '" alt="" width="576" style="display:block;width:100%;height:auto;max-height:360px;object-fit:cover;border:0"></a></p>' : '';
+		$small_image = $image ? '<a href="' . esc_url( $url ) . '"><img src="' . esc_url( $image ) . '" alt="" width="168" style="display:block;width:168px;max-width:168px;height:auto;max-height:126px;object-fit:cover;border:0"></a>' : '';
+
+		if ( in_array( $layout, array( 'compact_left', 'compact_right' ), true ) && $small_image ) {
+			$image_cell = '<td width="184" valign="top" style="width:184px;padding:' . ( 'compact_left' === $layout ? '0 16px 0 0' : '0 0 0 16px' ) . '">' . $small_image . '</td>';
+			$text_cell  = '<td valign="top">' . $date . $heading . $summary . $action . '</td>';
+			$html      .= '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0;padding-top:24px;border-top:1px solid #e9e6df"><tr>' . ( 'compact_left' === $layout ? $image_cell . $text_cell : $text_cell . $image_cell ) . '</tr></table>';
+			continue;
 		}
-		if ( 'image_first' === $layout ) {
-			$html .= $image_html;
+
+		$article_style = 'margin:28px 0;padding-top:24px;border-top:1px solid #e9e6df';
+		if ( 'framed' === $layout ) {
+			$article_style = 'margin:28px 0;padding:20px;border:1px solid #d9d5cc;background:#faf9f6';
 		}
-		$html .= '<p style="font-size:12px;color:#686d68">' . esc_html( get_the_date( '', $post ) ) . '</p>';
-		$html .= '<h3><a href="' . esc_url( $url ) . '" style="color:#171a17">' . esc_html( $title ) . '</a></h3>';
-		$html .= '<p>' . esc_html( $excerpt ) . '</p>';
-		if ( 'editorial' === $layout ) {
-			$html .= $image_html;
+		$html .= '<article style="' . esc_attr( $article_style ) . '">';
+		if ( 'bulletin' === $layout ) {
+			$html .= '<p style="margin:0 0 8px;font-size:12px;color:#686d68">' . esc_html( sprintf( '%02d', $index + 1 ) ) . ' / ' . esc_html( get_the_date( '', $post ) ) . '</p>' . $heading . $action;
+		} elseif ( 'minimal' === $layout ) {
+			$html .= $date . $heading . $action;
+		} elseif ( 'text_only' === $layout ) {
+			$html .= $date . $heading . $summary . $action;
+		} elseif ( 'image_only' === $layout ) {
+			$html .= $large_image . $heading;
+		} elseif ( 'image_first' === $layout || 'framed' === $layout ) {
+			$html .= $large_image . $date . $heading . $summary . $action;
+		} elseif ( 'feature' === $layout ) {
+			$html .= '<h2 style="margin:0 0 12px"><a href="' . esc_url( $url ) . '" style="color:#171a17">' . esc_html( $title ) . '</a></h2>' . $large_image . $summary . $action;
+		} else {
+			$html .= $date . $heading . $summary . $large_image . $action;
 		}
-		$html .= '<p><a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a></p></article>';
+		$html .= '</article>';
 	}
 
 	return $html . '</section>';

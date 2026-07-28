@@ -159,7 +159,11 @@ function newsletter_campaign_kit_create_campaign( $input, $actor_user_id = 0 ) {
 
 	$data = newsletter_campaign_kit_prepare_campaign_data( $input );
 	if ( is_wp_error( $data ) || ! newsletter_campaign_kit_campaigns_table_exists() ) {
-		return is_wp_error( $data ) ? $data : new WP_Error( 'newsletter_campaign_storage_unavailable', __( 'Campaign storage is unavailable.', 'newsletter-campaign-kit' ) );
+		$error = is_wp_error( $data ) ? $data : new WP_Error( 'newsletter_campaign_storage_unavailable', __( 'Campaign storage is unavailable.', 'newsletter-campaign-kit' ) );
+		if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
+			newsletter_campaign_kit_log_event( 'newsletter_campaign_create_failed', 'failure', 0, array( 'title' => sanitize_text_field( $input['title'] ?? '' ), 'reason' => $error->get_error_code() ) );
+		}
+		return $error;
 	}
 
 	$table = newsletter_campaign_kit_get_campaigns_table();
@@ -361,7 +365,8 @@ function newsletter_campaign_kit_handle_create_campaign() {
 	check_admin_referer( 'newsletter_campaign_kit_create_campaign' );
 
 	$result = newsletter_campaign_kit_create_campaign( newsletter_campaign_kit_get_campaign_input_from_request(), get_current_user_id() );
-	wp_safe_redirect( admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns&created=' . ( is_wp_error( $result ) ? 'invalid' : 'campaign' ) ) );
+	$created = is_wp_error( $result ) ? $result->get_error_code() : 'campaign';
+	wp_safe_redirect( add_query_arg( array( 'page' => 'newsletter-campaign-kit-campaigns', 'created' => sanitize_key( $created ) ), admin_url( 'admin.php' ) ) );
 	exit;
 }
 add_action( 'admin_post_newsletter_campaign_kit_create_campaign', 'newsletter_campaign_kit_handle_create_campaign' );
@@ -816,6 +821,18 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	$edit_id   = isset( $_GET['edit'] ) ? absint( $_GET['edit'] ) : 0;
 	$editing   = $edit_id ? newsletter_campaign_kit_get_campaign( $edit_id ) : null;
 	$editing   = $editing && 'draft' === $editing['status'] ? $editing : null;
+	$created_status = isset( $_GET['created'] ) ? sanitize_key( wp_unslash( $_GET['created'] ) ) : '';
+	$creation_errors = array(
+		'newsletter_invalid_content_source'           => __( 'Choose a valid WordPress content source.', 'newsletter-campaign-kit' ),
+		'newsletter_invalid_content_source_post_type' => __( 'The selected content type is unavailable.', 'newsletter-campaign-kit' ),
+		'newsletter_invalid_source_category'          => __( 'Choose an article category when using the category source.', 'newsletter-campaign-kit' ),
+		'newsletter_empty_source_selection'           => __( 'Choose at least one published item for the hand-picked source.', 'newsletter-campaign-kit' ),
+		'newsletter_invalid_audience'                  => __( 'Choose an available campaign audience.', 'newsletter-campaign-kit' ),
+		'newsletter_invalid_campaign_topic'           => __( 'Choose an active campaign topic or use no topic.', 'newsletter-campaign-kit' ),
+		'newsletter_invalid_campaign'                 => __( 'The internal campaign title is required.', 'newsletter-campaign-kit' ),
+		'newsletter_campaign_storage_unavailable'     => __( 'Campaign storage is unavailable. Check the plugin database tables.', 'newsletter-campaign-kit' ),
+		'newsletter_campaign_create_failed'            => __( 'The campaign could not be saved. Check the campaign audit log for details.', 'newsletter-campaign-kit' ),
+	);
 	$source_config = newsletter_campaign_kit_get_campaign_source_config( $editing ?: array() );
 	$source_type   = sanitize_key( $editing['source_type'] ?? 'manual' );
 	$source_post_types = newsletter_campaign_kit_get_content_source_post_type_labels();
@@ -860,6 +877,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 		<?php if ( ! newsletter_campaign_kit_campaigns_table_exists() ) : ?>
 			<div class="notice notice-warning"><p><?php esc_html_e( 'Campaign tables are not installed yet. Reactivate or upgrade the plugin with the database available.', 'newsletter-campaign-kit' ); ?></p></div>
 		<?php endif; ?>
+		<?php if ( isset( $creation_errors[ $created_status ] ) ) : ?><div class="notice notice-error is-dismissible"><p><?php echo esc_html( $creation_errors[ $created_status ] ); ?></p></div><?php endif; ?>
 
 		<dialog id="nck-campaign-editor" class="nck-admin-dialog"<?php echo $editing ? ' data-nck-dialog-auto-open' : ''; ?>>
 			<header class="nck-admin-dialog__header"><div><h2><?php echo esc_html( $editing ? __( 'Edit campaign draft', 'newsletter-campaign-kit' ) : __( 'Create campaign draft', 'newsletter-campaign-kit' ) ); ?></h2><p><?php esc_html_e( 'Compose the message, audience and optional WordPress content source.', 'newsletter-campaign-kit' ); ?></p></div><button class="nck-admin-dialog__close" type="button" data-nck-dialog-close aria-label="<?php esc_attr_e( 'Close', 'newsletter-campaign-kit' ); ?>">&times;</button></header>
@@ -930,7 +948,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 			<?php foreach ( $campaigns as $campaign ) : ?>
 				<tr>
 					<td><strong><?php echo esc_html( $campaign['title'] ); ?></strong><br><code><?php echo esc_html( $campaign['slug'] ); ?></code></td>
-					<td><?php echo ! empty( $campaign['topic_id'] ) && isset( $topic_labels[ (int) $campaign['topic_id'] ] ) ? esc_html( $topic_labels[ (int) $campaign['topic_id'] ] ) : esc_html__( 'Uncategorized', 'newsletter-campaign-kit' ); ?><br><small><?php echo esc_html( $campaign['subject'] ); ?></small></td>
+					<td><?php echo ! empty( $campaign['topic_id'] ) && isset( $topic_labels[ (int) $campaign['topic_id'] ] ) ? esc_html( $topic_labels[ (int) $campaign['topic_id'] ] ) : esc_html__( 'No topic', 'newsletter-campaign-kit' ); ?><br><small><?php echo esc_html( $campaign['subject'] ); ?></small></td>
 					<td>
 						<?php
 						if ( ! empty( $campaign['target_segment_id'] ) && isset( $segment_labels[ (int) $campaign['target_segment_id'] ] ) ) {

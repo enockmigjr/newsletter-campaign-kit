@@ -88,7 +88,7 @@ function newsletter_campaign_kit_send_with_http_api( $current_result, $campaign,
 		'recipient'  => array( 'email' => $subscriber['email'] ),
 		'from'       => array( 'name' => $settings['from_name'], 'email' => $settings['from_email'] ),
 		'subject'    => $subject,
-		'html'       => newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber ),
+		'html'       => newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber, $queue_item ),
 		'text'       => newsletter_campaign_kit_render_campaign_text( $campaign, $subscriber ),
 		'headers'    => newsletter_campaign_kit_get_one_click_headers( $subscriber, $settings ),
 	);

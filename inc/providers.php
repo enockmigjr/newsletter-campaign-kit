@@ -372,7 +372,7 @@ function newsletter_campaign_kit_handle_test_provider() {
 }
 add_action( 'admin_post_newsletter_campaign_kit_test_provider', 'newsletter_campaign_kit_handle_test_provider' );
 
-function newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber ) {
+function newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber, $queue_item = array() ) {
 	$body         = isset( $campaign['body'] ) ? newsletter_campaign_kit_sanitize_html_body( $campaign['body'] ) : '';
 	$subject      = isset( $campaign['subject'] ) ? sanitize_text_field( $campaign['subject'] ) : '';
 	$preview_text = isset( $campaign['preview_text'] ) ? sanitize_text_field( $campaign['preview_text'] ) : '';
@@ -390,6 +390,9 @@ function newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber ) 
 	$website      = esc_url_raw( $brand['website'] ?? home_url( '/' ) );
 	$accent       = sanitize_hex_color( $brand['accent'] ?? '' ) ?: '#1f6f54';
 	$background   = sanitize_hex_color( $brand['background'] ?? '' ) ?: '#f3f1ec';
+	if ( $queue_item && function_exists( 'newsletter_campaign_kit_apply_campaign_tracking' ) ) {
+		$body = newsletter_campaign_kit_apply_campaign_tracking( $body, $queue_item );
+	}
 
 	ob_start();
 	?><!doctype html><html lang="<?php echo esc_attr( get_bloginfo( 'language' ) ); ?>"><head><meta charset="<?php echo esc_attr( get_bloginfo( 'charset' ) ); ?>"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?php echo esc_html( $subject ); ?></title></head><body style="margin:0;padding:0;background:<?php echo esc_attr( $background ); ?>;color:#20231f;font-family:Arial,sans-serif;"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;"><?php echo esc_html( $preview_text ); ?></div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:<?php echo esc_attr( $background ); ?>;padding:24px 12px;"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border:1px solid #dedbd4;"><tr><td style="padding:24px 32px;border-bottom:1px solid #e9e6df;font-family:Georgia,serif;font-size:22px;color:#171a17;"><a href="<?php echo esc_url( $website ); ?>" style="color:#171a17;text-decoration:none;"><?php echo esc_html( $brand_name ); ?></a></td></tr><tr><td style="padding:40px 32px;font-size:16px;line-height:1.7;color:#2e322e;"><?php echo wp_kses_post( $body ); ?></td></tr><tr><td style="padding:22px 32px;border-top:1px solid #e9e6df;font-size:12px;line-height:1.7;color:#686d68;"><?php if ( $url ) : ?><a href="<?php echo esc_url( $url ); ?>" style="color:<?php echo esc_attr( $accent ); ?>;"><?php esc_html_e( 'Manage preferences or unsubscribe', 'newsletter-campaign-kit' ); ?></a><br><?php endif; ?><?php echo esc_html( sprintf( __( 'You receive this message from %s because you subscribed to its editorial updates.', 'newsletter-campaign-kit' ), $brand_name ) ); ?></td></tr></table></td></tr></table></body></html><?php
@@ -465,7 +468,7 @@ function newsletter_campaign_kit_send_with_wp_mail( $current_result, $campaign, 
 		'From: ' . $from_name . ' <' . $from_email . '>',
 	);
 	$headers    = array_merge( $headers, newsletter_campaign_kit_get_one_click_headers( $subscriber, $settings ) );
-	$message    = newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber );
+	$message    = newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber, $queue_item );
 	$alt_body   = newsletter_campaign_kit_render_campaign_text( $campaign, $subscriber );
 	$set_alt_body = static function ( $phpmailer ) use ( $alt_body ) {
 		$phpmailer->AltBody = $alt_body;

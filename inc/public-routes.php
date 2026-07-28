@@ -19,6 +19,13 @@ function newsletter_campaign_kit_is_public_path( $path ) {
 
 /** Dispatch clean public newsletter URLs before a theme 404 is rendered. */
 function newsletter_campaign_kit_dispatch_public_routes() {
+	if ( newsletter_campaign_kit_is_public_path( '/newsletter/open/' ) ) {
+		newsletter_campaign_kit_handle_open_tracking();
+	}
+	if ( newsletter_campaign_kit_is_public_path( '/newsletter/click/' ) ) {
+		newsletter_campaign_kit_handle_click_tracking();
+	}
+
 	if ( newsletter_campaign_kit_is_public_path( '/newsletter/subscribe/' ) ) {
 		if ( 'POST' !== strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) ) {
 			wp_safe_redirect( home_url( '/' ) );

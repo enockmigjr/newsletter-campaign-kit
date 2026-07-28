@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.22.0
+ * Version: 0.23.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.22.0' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.23.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEWSLETTER_CAMPAIGN_KIT_URL', plugin_dir_url( __FILE__ ) );
 
@@ -112,6 +112,12 @@ function newsletter_campaign_kit_get_subscriber_topics_table() {
 	global $wpdb;
 
 	return $wpdb->prefix . 'newsletter_campaign_subscriber_topics';
+}
+
+function newsletter_campaign_kit_get_tracking_events_table() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'newsletter_campaign_tracking_events';
 }
 
 function newsletter_campaign_kit_get_suppressions_table() {
@@ -297,6 +303,30 @@ function newsletter_campaign_kit_activate() {
 	) {$charset_collate};";
 
 	dbDelta( $queue_sql );
+	$tracking_events_table = newsletter_campaign_kit_get_tracking_events_table();
+	$tracking_events_sql   = "CREATE TABLE {$tracking_events_table} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		campaign_id bigint(20) unsigned NOT NULL,
+		queue_id bigint(20) unsigned NOT NULL,
+		subscriber_id bigint(20) unsigned NOT NULL,
+		event_type varchar(24) NOT NULL,
+		destination_url text NULL,
+		destination_hash char(64) NULL,
+		event_label varchar(120) NULL,
+		event_value decimal(14,2) NULL,
+		is_bot tinyint(1) unsigned NOT NULL DEFAULT 0,
+		ip_hash char(64) NULL,
+		user_agent varchar(255) NULL,
+		created_at datetime NOT NULL,
+		PRIMARY KEY  (id),
+		KEY campaign_event (campaign_id, event_type),
+		KEY queue_event (queue_id, event_type),
+		KEY subscriber_event (subscriber_id, event_type),
+		KEY destination_hash (destination_hash),
+		KEY created_at (created_at)
+	) {$charset_collate};";
+
+	dbDelta( $tracking_events_sql );
 	$snapshots_table = newsletter_campaign_kit_get_audience_snapshots_table();
 	$snapshots_sql   = "CREATE TABLE {$snapshots_table} (
 		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -506,6 +536,7 @@ require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/import.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/import-admin.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/segment-engine.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/preferences.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/tracking.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audience-snapshots.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/templates.php';

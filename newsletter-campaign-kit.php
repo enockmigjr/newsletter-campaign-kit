@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Newsletter Campaign Kit
  * Description: Reusable newsletter subscription and campaign foundation for WordPress projects.
- * Version: 0.23.0
+ * Version: 0.24.0
  * Author: PhotoVault
  * Text Domain: newsletter-campaign-kit
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.23.0' );
+define( 'NEWSLETTER_CAMPAIGN_KIT_VERSION', '0.24.0' );
 define( 'NEWSLETTER_CAMPAIGN_KIT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEWSLETTER_CAMPAIGN_KIT_URL', plugin_dir_url( __FILE__ ) );
 
@@ -224,6 +224,13 @@ function newsletter_campaign_kit_activate() {
 		target_list_id bigint(20) unsigned NULL,
 		target_segment_id bigint(20) unsigned NULL,
 		topic_id bigint(20) unsigned NULL,
+		source_type varchar(32) NOT NULL DEFAULT 'manual',
+		source_config longtext NULL,
+		parent_campaign_id bigint(20) unsigned NULL,
+		occurrence_number int(10) unsigned NULL,
+		recurrence_interval_days smallint(5) unsigned NULL,
+		recurrence_until date NULL,
+		next_occurrence_at datetime NULL,
 		scheduled_at datetime NULL,
 		sent_at datetime NULL,
 		created_by bigint(20) unsigned NULL,
@@ -237,6 +244,8 @@ function newsletter_campaign_kit_activate() {
 		KEY target_list_id (target_list_id),
 		KEY target_segment_id (target_segment_id),
 		KEY topic_id (topic_id),
+		KEY parent_campaign_id (parent_campaign_id),
+		KEY next_occurrence_at (next_occurrence_at),
 		KEY scheduled_at (scheduled_at)
 	) {$charset_collate};";
 
@@ -541,6 +550,7 @@ require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audit.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/audience-snapshots.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/templates.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/blocks.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/content-sources.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/campaigns.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/http-provider.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/providers.php';
@@ -550,6 +560,7 @@ require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/double-opt-in.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/public-routes.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/public-rest.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/queue.php';
+require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/recurrence.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/scheduler.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/reports.php';
 require_once NEWSLETTER_CAMPAIGN_KIT_DIR . 'inc/exports.php';

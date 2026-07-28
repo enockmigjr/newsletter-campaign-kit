@@ -20,7 +20,9 @@ function newsletter_campaign_kit_get_campaign_statuses() {
 		'ready'     => __( 'Ready', 'newsletter-campaign-kit' ),
 		'scheduled' => __( 'Scheduled', 'newsletter-campaign-kit' ),
 		'sending'   => __( 'Sending', 'newsletter-campaign-kit' ),
+		'recurring' => __( 'Recurring', 'newsletter-campaign-kit' ),
 		'sent'      => __( 'Sent', 'newsletter-campaign-kit' ),
+		'completed' => __( 'Completed', 'newsletter-campaign-kit' ),
 		'paused'    => __( 'Paused', 'newsletter-campaign-kit' ),
 		'cancelled' => __( 'Cancelled', 'newsletter-campaign-kit' ),
 	);
@@ -33,7 +35,9 @@ function newsletter_campaign_kit_get_allowed_campaign_transitions() {
 		'scheduled' => array( 'ready', 'sending', 'cancelled' ),
 		'sending'   => array( 'paused', 'sent' ),
 		'paused'    => array( 'sending', 'cancelled' ),
+		'recurring' => array( 'cancelled', 'completed' ),
 		'sent'      => array(),
+		'completed' => array(),
 		'cancelled' => array(),
 	);
 }
@@ -125,15 +129,17 @@ function newsletter_campaign_kit_prepare_campaign_data( $input ) {
 	);
 	$audience = newsletter_campaign_kit_resolve_campaign_audience( isset( $input['target_audience'] ) ? $input['target_audience'] : 'all' );
 	$topic_id = isset( $input['topic_id'] ) ? absint( $input['topic_id'] ) : 0;
+	$source   = newsletter_campaign_kit_prepare_content_source( $input );
 
-	if ( '' === $title || is_wp_error( $content ) || is_wp_error( $audience ) ) {
-		return is_wp_error( $content ) ? $content : ( is_wp_error( $audience ) ? $audience : new WP_Error( 'newsletter_invalid_campaign', __( 'The campaign title is required.', 'newsletter-campaign-kit' ) ) );
+	if ( '' === $title || is_wp_error( $content ) || is_wp_error( $audience ) || is_wp_error( $source ) ) {
+		return is_wp_error( $content ) ? $content : ( is_wp_error( $audience ) ? $audience : ( is_wp_error( $source ) ? $source : new WP_Error( 'newsletter_invalid_campaign', __( 'The campaign title is required.', 'newsletter-campaign-kit' ) ) ) );
 	}
 	if ( $topic_id && ! newsletter_campaign_kit_record_is_active( newsletter_campaign_kit_get_topics_table(), $topic_id ) ) {
 		return new WP_Error( 'newsletter_invalid_campaign_topic', __( 'The selected campaign topic is unavailable.', 'newsletter-campaign-kit' ) );
 	}
 
-	return array(
+	return array_merge(
+		array(
 		'title'             => $title,
 		'subject'           => $content['subject'],
 		'preview_text'      => $content['preview_text'],
@@ -143,6 +149,8 @@ function newsletter_campaign_kit_prepare_campaign_data( $input ) {
 		'target_list_id'    => $audience['target_list_id'],
 		'target_segment_id' => $audience['target_segment_id'],
 		'topic_id'          => $topic_id ? $topic_id : null,
+		),
+		$source
 	);
 }
 
@@ -226,6 +234,11 @@ function newsletter_campaign_kit_duplicate_campaign( $campaign_id, $actor_user_i
 			'text_body'       => $campaign['text_body'],
 			'target_audience' => $audience,
 			'topic_id'        => ! empty( $campaign['topic_id'] ) && newsletter_campaign_kit_record_is_active( newsletter_campaign_kit_get_topics_table(), $campaign['topic_id'] ) ? $campaign['topic_id'] : 0,
+			'source_type'     => $campaign['source_type'] ?? 'manual',
+			'source_post_count' => newsletter_campaign_kit_get_campaign_source_config( $campaign )['post_count'],
+			'source_window_hours' => newsletter_campaign_kit_get_campaign_source_config( $campaign )['window_hours'],
+			'source_category_id' => newsletter_campaign_kit_get_campaign_source_config( $campaign )['category_id'],
+			'source_post_ids' => newsletter_campaign_kit_get_campaign_source_config( $campaign )['post_ids'],
 		),
 		$actor_user_id
 	);
@@ -281,6 +294,8 @@ function newsletter_campaign_kit_prepare_campaign_delivery_review( $campaign ) {
 		'target_list_id'    => absint( $campaign['target_list_id'] ?? 0 ),
 		'target_segment_id' => absint( $campaign['target_segment_id'] ?? 0 ),
 		'topic_id'          => absint( $campaign['topic_id'] ?? 0 ),
+		'source_type'       => sanitize_key( $campaign['source_type'] ?? 'manual' ),
+		'source_config'     => (string) ( $campaign['source_config'] ?? '' ),
 		'updated_at'        => (string) $campaign['updated_at'],
 		'snapshot_id'       => absint( $snapshot['id'] ?? 0 ),
 		'recipient_ids'     => $recipient_ids,
@@ -327,6 +342,11 @@ function newsletter_campaign_kit_get_campaign_input_from_request() {
 		'text_body'       => isset( $_POST['campaign_text_body'] ) ? wp_unslash( $_POST['campaign_text_body'] ) : '',
 		'target_audience' => isset( $_POST['target_audience'] ) ? wp_unslash( $_POST['target_audience'] ) : 'all',
 		'topic_id'        => isset( $_POST['topic_id'] ) ? absint( $_POST['topic_id'] ) : 0,
+		'source_type'     => isset( $_POST['content_source_type'] ) ? wp_unslash( $_POST['content_source_type'] ) : 'manual',
+		'source_post_count' => isset( $_POST['source_post_count'] ) ? absint( $_POST['source_post_count'] ) : 5,
+		'source_window_hours' => isset( $_POST['source_window_hours'] ) ? absint( $_POST['source_window_hours'] ) : 24,
+		'source_category_id' => isset( $_POST['source_category_id'] ) ? absint( $_POST['source_category_id'] ) : 0,
+		'source_post_ids' => isset( $_POST['source_post_ids'] ) && is_array( $_POST['source_post_ids'] ) ? array_map( 'absint', wp_unslash( $_POST['source_post_ids'] ) ) : array(),
 	);
 }
 
@@ -563,7 +583,12 @@ function newsletter_campaign_kit_handle_schedule_campaign() {
 	}
 	$confirmed_title = isset( $_POST['campaign_confirmation_title'] ) ? wp_unslash( $_POST['campaign_confirmation_title'] ) : '';
 	$fingerprint     = isset( $_POST['campaign_confirmation_fingerprint'] ) ? wp_unslash( $_POST['campaign_confirmation_fingerprint'] ) : '';
-	$result  = newsletter_campaign_kit_schedule_confirmed_campaign( $campaign_id, $date, $confirmed_title, $fingerprint, get_current_user_id() );
+	$is_recurring    = ! empty( $_POST['campaign_recurrence_enabled'] );
+	$interval_days   = isset( $_POST['campaign_recurrence_interval_days'] ) ? absint( $_POST['campaign_recurrence_interval_days'] ) : 7;
+	$until           = isset( $_POST['campaign_recurrence_until'] ) ? wp_unslash( $_POST['campaign_recurrence_until'] ) : '';
+	$result          = $is_recurring
+		? newsletter_campaign_kit_schedule_confirmed_recurrence( $campaign_id, $date, $interval_days, $until, $confirmed_title, $fingerprint, get_current_user_id() )
+		: newsletter_campaign_kit_schedule_confirmed_campaign( $campaign_id, $date, $confirmed_title, $fingerprint, get_current_user_id() );
 	$updated = ! is_wp_error( $result );
 
 	if ( function_exists( 'newsletter_campaign_kit_log_event' ) ) {
@@ -571,7 +596,7 @@ function newsletter_campaign_kit_handle_schedule_campaign() {
 			! $updated ? 'newsletter_campaign_schedule_failed' : 'newsletter_campaign_scheduled',
 			! $updated ? 'failure' : 'success',
 			0,
-			array( 'campaign_id' => $campaign_id, 'scheduled_at' => $date )
+			array( 'campaign_id' => $campaign_id, 'scheduled_at' => $date, 'recurring' => $is_recurring, 'interval_days' => $is_recurring ? $interval_days : 0 )
 		);
 	}
 
@@ -692,6 +717,12 @@ function newsletter_campaign_kit_render_campaign_review_page() {
 						<input type="hidden" name="campaign_confirmation_fingerprint" value="<?php echo esc_attr( $review['fingerprint'] ); ?>">
 						<?php wp_nonce_field( 'newsletter_campaign_kit_schedule_campaign_' . $campaign_id ); ?>
 						<label><?php esc_html_e( 'Delivery date', 'newsletter-campaign-kit' ); ?> <input type="datetime-local" name="scheduled_at" value="<?php echo esc_attr( $scheduled_value ); ?>" required></label>
+						<details class="nck-recurrence-options">
+							<summary><?php esc_html_e( 'Repeat this campaign', 'newsletter-campaign-kit' ); ?></summary>
+							<label><input type="checkbox" name="campaign_recurrence_enabled" value="1"> <?php esc_html_e( 'Create recurring occurrences', 'newsletter-campaign-kit' ); ?></label>
+							<label><?php esc_html_e( 'Repeat every', 'newsletter-campaign-kit' ); ?> <input type="number" name="campaign_recurrence_interval_days" min="1" max="365" value="7"> <?php esc_html_e( 'day(s)', 'newsletter-campaign-kit' ); ?></label>
+							<label><?php esc_html_e( 'Stop after', 'newsletter-campaign-kit' ); ?> <input type="date" name="campaign_recurrence_until" min="<?php echo esc_attr( wp_date( 'Y-m-d', strtotime( '+1 day' ) ) ); ?>"></label>
+						</details>
 						<input class="regular-text" name="campaign_confirmation_title" required autocomplete="off" placeholder="<?php esc_attr_e( 'Exact campaign title', 'newsletter-campaign-kit' ); ?>">
 						<button class="button" type="submit"><?php esc_html_e( 'Confirm and schedule', 'newsletter-campaign-kit' ); ?></button>
 					</form>
@@ -722,6 +753,10 @@ function newsletter_campaign_kit_render_campaigns_page() {
 	$edit_id   = isset( $_GET['edit'] ) ? absint( $_GET['edit'] ) : 0;
 	$editing   = $edit_id ? newsletter_campaign_kit_get_campaign( $edit_id ) : null;
 	$editing   = $editing && 'draft' === $editing['status'] ? $editing : null;
+	$source_config = newsletter_campaign_kit_get_campaign_source_config( $editing ?: array() );
+	$source_type   = sanitize_key( $editing['source_type'] ?? 'manual' );
+	$source_categories = get_categories( array( 'hide_empty' => false, 'number' => 100 ) );
+	$source_posts      = get_posts( array( 'post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 100, 'orderby' => 'date', 'order' => 'DESC' ) );
 	$selected_audience = 'all';
 	if ( $editing && ! empty( $editing['target_list_id'] ) ) {
 		$selected_audience = 'list:' . absint( $editing['target_list_id'] );
@@ -791,6 +826,17 @@ function newsletter_campaign_kit_render_campaigns_page() {
 						<?php endforeach; ?>
 					</select>
 				</p>
+				<fieldset class="nck-content-source">
+					<legend><?php esc_html_e( 'WordPress article source', 'newsletter-campaign-kit' ); ?></legend>
+					<p class="description"><?php esc_html_e( 'Append a live article selection when each delivery is generated. Recurring occurrences resolve this source independently.', 'newsletter-campaign-kit' ); ?></p>
+					<p><label for="nck-content-source-type"><?php esc_html_e( 'Source mode', 'newsletter-campaign-kit' ); ?></label><br><select id="nck-content-source-type" name="content_source_type"><?php foreach ( newsletter_campaign_kit_get_content_source_types() as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $source_type, $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></p>
+					<div class="nck-form-grid">
+						<p><label><?php esc_html_e( 'Maximum articles', 'newsletter-campaign-kit' ); ?><input type="number" name="source_post_count" min="1" max="20" value="<?php echo esc_attr( $source_config['post_count'] ); ?>"></label></p>
+						<p><label><?php esc_html_e( 'Recent window (hours)', 'newsletter-campaign-kit' ); ?><input type="number" name="source_window_hours" min="1" max="720" value="<?php echo esc_attr( $source_config['window_hours'] ); ?>"></label></p>
+					</div>
+					<p><label><?php esc_html_e( 'Article category', 'newsletter-campaign-kit' ); ?><br><select name="source_category_id"><option value="0"><?php esc_html_e( 'Choose a category', 'newsletter-campaign-kit' ); ?></option><?php foreach ( $source_categories as $category ) : ?><option value="<?php echo esc_attr( $category->term_id ); ?>" <?php selected( absint( $source_config['category_id'] ), $category->term_id ); ?>><?php echo esc_html( $category->name ); ?></option><?php endforeach; ?></select></label></p>
+					<p><label><?php esc_html_e( 'Hand-picked articles', 'newsletter-campaign-kit' ); ?><br><select class="large-text" name="source_post_ids[]" multiple size="7"><?php foreach ( $source_posts as $source_post ) : ?><option value="<?php echo esc_attr( $source_post->ID ); ?>" <?php selected( in_array( $source_post->ID, array_map( 'absint', (array) $source_config['post_ids'] ), true ) ); ?>><?php echo esc_html( get_the_date( 'Y-m-d', $source_post ) . ' - ' . get_the_title( $source_post ) ); ?></option><?php endforeach; ?></select></label></p>
+				</fieldset>
 				<?php if ( $blocks ) : ?>
 					<div class="nck-block-inserter">
 						<label for="nck-editorial-block"><?php esc_html_e( 'Editorial block', 'newsletter-campaign-kit' ); ?></label>
@@ -827,7 +873,7 @@ function newsletter_campaign_kit_render_campaigns_page() {
 					</td>
 					<td><?php echo esc_html( number_format_i18n( newsletter_campaign_kit_get_campaign_audience_count( $campaign ) ) ); ?></td>
 					<td><code><?php echo esc_html( isset( $statuses[ $campaign['status'] ] ) ? $statuses[ $campaign['status'] ] : $campaign['status'] ); ?></code></td>
-					<td><?php echo ! empty( $campaign['scheduled_at'] ) ? esc_html( get_date_from_gmt( $campaign['scheduled_at'], 'Y-m-d H:i' ) ) : esc_html__( 'Not scheduled', 'newsletter-campaign-kit' ); ?></td>
+					<td><?php if ( ! empty( $campaign['next_occurrence_at'] ) ) : ?><strong><?php echo esc_html( get_date_from_gmt( $campaign['next_occurrence_at'], 'Y-m-d H:i' ) ); ?></strong><br><small><?php echo esc_html( sprintf( __( 'Every %d day(s)', 'newsletter-campaign-kit' ), absint( $campaign['recurrence_interval_days'] ) ) ); ?></small><?php elseif ( ! empty( $campaign['scheduled_at'] ) ) : echo esc_html( get_date_from_gmt( $campaign['scheduled_at'], 'Y-m-d H:i' ) ); else : esc_html_e( 'Not scheduled', 'newsletter-campaign-kit' ); endif; ?></td>
 					<td><?php echo esc_html( get_date_from_gmt( $campaign['updated_at'], 'Y-m-d H:i' ) ); ?></td>
 					<td><div class="nck-inline-actions"><a class="button button-small" target="_blank" rel="noopener" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=newsletter_campaign_kit_preview&kind=campaign&id=' . absint( $campaign['id'] ) ), 'newsletter_campaign_kit_preview_campaign_' . absint( $campaign['id'] ) ) ); ?>"><?php esc_html_e( 'Preview', 'newsletter-campaign-kit' ); ?></a><?php if ( 'draft' === $campaign['status'] ) : ?><a class="button button-small" href="<?php echo esc_url( add_query_arg( 'edit', absint( $campaign['id'] ), admin_url( 'admin.php?page=newsletter-campaign-kit-campaigns' ) ) ); ?>"><?php esc_html_e( 'Edit', 'newsletter-campaign-kit' ); ?></a><?php endif; ?><form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="newsletter_campaign_kit_duplicate_campaign"><input type="hidden" name="campaign_id" value="<?php echo esc_attr( $campaign['id'] ); ?>"><?php wp_nonce_field( 'newsletter_campaign_kit_duplicate_campaign_' . absint( $campaign['id'] ) ); ?><button class="button button-small" type="submit"><?php esc_html_e( 'Duplicate', 'newsletter-campaign-kit' ); ?></button></form><?php newsletter_campaign_kit_render_campaign_transition_actions( $campaign ); ?></div></td>
 				</tr>
@@ -836,6 +882,6 @@ function newsletter_campaign_kit_render_campaigns_page() {
 		</table></div>
 		<?php newsletter_campaign_kit_render_pagination( $current_page, $total, $per_page, array( 'page' => 'newsletter-campaign-kit-campaigns' ) ); ?>
 	</div>
-	<style>.newsletter-campaign-kit-admin .nck-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;margin:18px 0;padding:16px}.newsletter-campaign-kit-admin .nck-inline-actions,.newsletter-campaign-kit-admin .nck-block-inserter{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.newsletter-campaign-kit-admin .nck-block-inserter{margin:16px 0}.newsletter-campaign-kit-admin .nck-block-inserter .dashicons{vertical-align:text-bottom}</style>
+	<style>.newsletter-campaign-kit-admin .nck-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;margin:18px 0;padding:16px}.newsletter-campaign-kit-admin .nck-inline-actions,.newsletter-campaign-kit-admin .nck-block-inserter{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.newsletter-campaign-kit-admin .nck-block-inserter{margin:16px 0}.newsletter-campaign-kit-admin .nck-block-inserter .dashicons{vertical-align:text-bottom}.newsletter-campaign-kit-admin .nck-content-source{margin:20px 0;border:1px solid #dcdcde;padding:16px}.newsletter-campaign-kit-admin .nck-content-source legend{font-weight:700;padding:0 6px}.newsletter-campaign-kit-admin .nck-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.newsletter-campaign-kit-admin .nck-recurrence-options{width:100%;border:1px solid #dcdcde;padding:10px}.newsletter-campaign-kit-admin .nck-recurrence-options summary{font-weight:600;cursor:pointer}.newsletter-campaign-kit-admin .nck-recurrence-options label{display:inline-flex;gap:6px;align-items:center;margin:10px 14px 0 0}@media(max-width:700px){.newsletter-campaign-kit-admin .nck-form-grid{grid-template-columns:1fr}}</style>
 	<?php
 }

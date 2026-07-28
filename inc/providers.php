@@ -373,7 +373,8 @@ function newsletter_campaign_kit_handle_test_provider() {
 add_action( 'admin_post_newsletter_campaign_kit_test_provider', 'newsletter_campaign_kit_handle_test_provider' );
 
 function newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber, $queue_item = array() ) {
-	$body         = isset( $campaign['body'] ) ? newsletter_campaign_kit_sanitize_html_body( $campaign['body'] ) : '';
+	$resolved_body = function_exists( 'newsletter_campaign_kit_resolve_dynamic_campaign_body' ) ? newsletter_campaign_kit_resolve_dynamic_campaign_body( $campaign ) : ( $campaign['body'] ?? '' );
+	$body         = newsletter_campaign_kit_sanitize_html_body( $resolved_body );
 	$subject      = isset( $campaign['subject'] ) ? sanitize_text_field( $campaign['subject'] ) : '';
 	$preview_text = isset( $campaign['preview_text'] ) ? sanitize_text_field( $campaign['preview_text'] ) : '';
 	$body         = '' !== trim( $body ) ? $body : '<p>' . esc_html( $subject ) . '</p>';
@@ -402,8 +403,8 @@ function newsletter_campaign_kit_render_campaign_body( $campaign, $subscriber, $
 
 function newsletter_campaign_kit_render_campaign_text( $campaign, $subscriber ) {
 	$text = isset( $campaign['text_body'] ) ? newsletter_campaign_kit_sanitize_text_body( $campaign['text_body'] ) : '';
-	if ( '' === $text ) {
-		$html = isset( $campaign['body'] ) ? $campaign['body'] : '';
+	if ( '' === $text || 'manual' !== sanitize_key( $campaign['source_type'] ?? 'manual' ) ) {
+		$html = function_exists( 'newsletter_campaign_kit_resolve_dynamic_campaign_body' ) ? newsletter_campaign_kit_resolve_dynamic_campaign_body( $campaign ) : ( $campaign['body'] ?? '' );
 		$text = newsletter_campaign_kit_html_to_text( $html );
 	}
 	$url = function_exists( 'newsletter_campaign_kit_get_preferences_url' ) && ! empty( $subscriber['unsubscribe_token'] ) ? newsletter_campaign_kit_get_preferences_url( $subscriber['unsubscribe_token'] ) : '';

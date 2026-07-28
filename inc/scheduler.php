@@ -251,6 +251,7 @@ function newsletter_campaign_kit_run_scheduler() {
 	try {
 		$settings  = newsletter_campaign_kit_get_provider_settings();
 		$recovered = newsletter_campaign_kit_recover_stale_queue_locks();
+		$recurrences = newsletter_campaign_kit_claim_due_recurrences();
 		$claimed   = newsletter_campaign_kit_claim_due_campaigns();
 		$processed = newsletter_campaign_kit_process_queue_batch( $settings['queue_batch_size'] );
 		$finalized = newsletter_campaign_kit_finalize_campaigns();
@@ -274,13 +275,14 @@ function newsletter_campaign_kit_run_scheduler() {
 		return new WP_Error( 'newsletter_scheduler_failed', __( 'The newsletter scheduler failed.', 'newsletter-campaign-kit' ) );
 	}
 
-	if ( function_exists( 'newsletter_campaign_kit_log_event' ) && ( $recovered || $claimed || $processed['processed'] || $finalized || $cleaned ) ) {
+	if ( function_exists( 'newsletter_campaign_kit_log_event' ) && ( $recovered || $recurrences || $claimed || $processed['processed'] || $finalized || $cleaned ) ) {
 		newsletter_campaign_kit_log_event(
 			'newsletter_scheduler_run',
 			'info',
 			0,
 			array(
 				'recovered' => $recovered,
+				'recurrences' => count( $recurrences ),
 				'claimed'   => count( $claimed ),
 				'processed' => $processed['processed'],
 				'finalized' => $finalized,
@@ -290,6 +292,7 @@ function newsletter_campaign_kit_run_scheduler() {
 	}
 	$result = array(
 		'recovered' => $recovered,
+		'recurrences' => count( $recurrences ),
 		'claimed'   => count( $claimed ),
 		'processed' => $processed,
 		'finalized' => $finalized,
@@ -302,6 +305,7 @@ function newsletter_campaign_kit_run_scheduler() {
 		'last_duration_ms' => (int) round( ( microtime( true ) - $started_at ) * 1000 ),
 		'last_result'      => array(
 			'recovered' => absint( $recovered ),
+			'recurrences' => count( $recurrences ),
 			'claimed'   => count( $claimed ),
 			'processed' => absint( $processed['processed'] ),
 			'finalized' => absint( $finalized ),

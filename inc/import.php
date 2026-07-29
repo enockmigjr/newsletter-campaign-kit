@@ -33,7 +33,7 @@ function newsletter_campaign_kit_detect_csv_delimiter( $line ) {
 	$max_fields = 0;
 
 	foreach ( $delimiters as $delimiter ) {
-		$fields = str_getcsv( (string) $line, $delimiter );
+		$fields = str_getcsv( (string) $line, $delimiter, '"', '' );
 		if ( count( $fields ) > $max_fields ) {
 			$max_fields = count( $fields );
 			$selected   = $delimiter;
@@ -199,7 +199,7 @@ function newsletter_campaign_kit_process_csv_import( $path, $options = array() )
 	$first_line = fgets( $handle );
 	$delimiter  = newsletter_campaign_kit_detect_csv_delimiter( $first_line );
 	rewind( $handle );
-	$headers = fgetcsv( $handle, 0, $delimiter );
+	$headers = fgetcsv( $handle, 0, $delimiter, '"', '' );
 	if ( ! is_array( $headers ) ) {
 		fclose( $handle );
 		return new WP_Error( 'newsletter_import_empty', __( 'The CSV file does not contain a header row.', 'newsletter-campaign-kit' ) );
@@ -220,7 +220,7 @@ function newsletter_campaign_kit_process_csv_import( $path, $options = array() )
 	$seen      = array();
 	$report    = array( 'mode' => $options['apply'] ? 'apply' : 'preview', 'total' => 0, 'valid' => 0, 'applied' => 0, 'errors' => 0, 'rows' => array() );
 	$line      = 1;
-	while ( ( $columns = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+	while ( ( $columns = fgetcsv( $handle, 0, $delimiter, '"', '' ) ) !== false ) {
 		$line++;
 		if ( $line - 1 > newsletter_campaign_kit_import_max_rows() ) {
 			$report['errors']++;

@@ -158,6 +158,9 @@
 						control.disabled = field.hidden;
 					});
 				});
+				container.querySelectorAll('[data-nck-source-content-type][data-nck-content-type-bound="1"]').forEach(function(contentType) {
+					contentType.dispatchEvent(new Event('change'));
+				});
 				validateHandPicked(container);
 			}
 			if (select.dataset.nckSourceBound !== '1') {
@@ -171,13 +174,14 @@
 			const contentSelects = form ? form.querySelectorAll('[data-nck-source-content-items], [data-nck-source-content-categories]') : [];
 			if (!contentSelects.length) return;
 			function syncContentItems() {
+				const sourceActive = !select.disabled;
 				contentSelects.forEach(function(contentSelect) {
 					contentSelect.querySelectorAll('[data-nck-post-type]').forEach(function(item) {
 						const matches = item.dataset.nckPostType === select.value;
 						const control = item.matches('option') ? item : item.querySelector('input');
 						item.hidden = !matches;
 						if (!control) return;
-						control.disabled = !matches;
+						control.disabled = !sourceActive || !matches;
 						if (!matches) {
 							if (control.matches('option')) {
 								control.selected = false;
